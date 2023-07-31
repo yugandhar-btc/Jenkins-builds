@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="com.google.android.providers.gsf.permission.READ_GSERVICES" />
+    <uses-permission android:name="android.permission.READ_SYNC_SETTINGS" />
+    <uses-permission android:name="android.permission.WRITE_SYNC_SETTINGS" />
+    <uses-permission android:name="android.permission.AUTHENTICATE_ACCOUNTS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <application
+        android:name="com.harvard.FdaApplication"
+        android:allowBackup="false"
+        tools:replace="android:allowBackup"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:largeHeap="true"
+        android:resizeableActivity="false"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="true">
+        <activity
+            android:name="com.harvard.studyappmodule.StandaloneStudyInfoActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"></activity>
+        <activity
+            android:name="com.harvard.studyappmodule.StandaloneActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="@string/FileProvider_authorities"
+            android:exported="false"
+            android:grantUriPermissions="true"
+            tools:replace="android:authorities">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
+
+        <activity
+            android:name="com.harvard.gatewaymodule.GatewayActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.SplashActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:exported="true"
+            android:windowSoftInputMode="stateHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.harvard.usermodule.SignupActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:exported="true"
+            android:windowSoftInputMode="stateHidden|adjustPan">
+            <intent-filter android:label="@string/filter_signup">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="@string/deeplink_host"
+                    android:pathPrefix="/mystudies/signup"
+                    android:scheme="app" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.harvard.usermodule.LoginCallbackActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:exported="true"
+            android:windowSoftInputMode="stateHidden|adjustPan">
+            <intent-filter android:label="@string/filter_callback">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="@string/deeplink_host"
+                    android:pathPrefix="/mystudies/callback"
+                    android:scheme="app" />
+            </intent-filter>
+            <intent-filter android:label="@string/filter_activation">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="@string/deeplink_host"
+                    android:pathPrefix="/mystudies/activation"
+                    android:scheme="app" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.harvard.usermodule.AuthServerErrorHandler"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:exported="true"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden|adjustPan">
+            <intent-filter android:label="@string/filter_error">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="@string/deeplink_host"
+                    android:pathPrefix="/mystudies/error"
+                    android:scheme="app" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.harvard.usermodule.VerificationStepActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.usermodule.SignupProcessCompleteActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.passcodemodule.PasscodeSetupActivity"
+            android:configChanges="screenLayout|orientation"
+            android:theme="@style/passcodeTheme"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.usermodule.ForgotPasswordActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:exported="true"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="adjustResize|stateHidden">
+            <intent-filter android:label="@string/filter_forgotPassword">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="@string/deeplink_host"
+                    android:pathPrefix="/mystudies/forgotPassword"
+                    android:scheme="app" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.harvard.studyappmodule.StudyActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden|adjustNothing" />
+        <activity
+            android:name="com.harvard.studyappmodule.StudySignInActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.studyappmodule.StudyInfoActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.studyappmodule.SurveyActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.studyappmodule.NotificationActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.studyappmodule.ChangePasswordActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden|adjustPan" />
+        <activity
+            android:name="com.harvard.studyappmodule.DeleteAccountActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.usermodule.TermsPrivacyPolicyActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:exported="true"
+            android:windowSoftInputMode="stateHidden">
+            <intent-filter android:label="@string/filter_privacy">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="@string/deeplink_host"
+                    android:pathPrefix="/mystudies/privacyPolicy"
+                    android:scheme="app" />
+            </intent-filter>
+            <intent-filter android:label="@string/filter_terms">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="@string/deeplink_host"
+                    android:pathPrefix="/mystudies/terms"
+                    android:scheme="app" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.harvard.studyappmodule.consent.CustomConsentViewTaskActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+        <activity
+            android:name="org.researchstack.backbone.ui.ViewWebDocumentActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"
+            android:windowSoftInputMode="stateHidden" />
+
+        <activity
+            android:name="com.harvard.studyappmodule.EligibilityEnrollmentActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar1"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.studyappmodule.activitybuilder.CustomSurveyViewTaskActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+        <activity
+            android:name="com.harvard.eligibilitymodule.CustomViewTaskActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+
+        <activity
+            android:name="com.harvard.WebViewActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.studyappmodule.ConsentCompletedActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.studyappmodule.ContactUsActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden|adjustPan" />
+        <activity
+            android:name="com.harvard.studyappmodule.FeedbackActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden|adjustPan" />
+        <activity
+            android:name="com.harvard.studyappmodule.EnrollmentValidatedActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden|adjustPan" />
+
+        <meta-data
+            android:name="com.google.android.maps.v2.API_KEY"
+            android:value="@string/google_maps_Key" />
+        <meta-data
+            android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
+
+        <activity
+            android:name="com.harvard.studyappmodule.SurveyCompleteActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.studyappmodule.ResourcesWebViewActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.studyappmodule.PdfDisplayActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.usermodule.NewPasscodeSetupActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+        <activity
+            android:name="com.harvard.usermodule.ConfirmPasscodeSetup"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden|adjustResize" />
+
+        <service android:name="com.harvard.AppFirebaseMessagingService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <service android:name="com.harvard.AppFirebaseInstanceIdService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.firebase.INSTANCE_ID_EVENT" />
+            </intent-filter>
+        </service>
+
+        <activity
+            android:name="com.harvard.studyappmodule.ChartActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/AppThemeNoActionBar"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name="com.harvard.studyappmodule.GatewayResourcesWebViewActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"
+            android:windowSoftInputMode="stateHidden" />
+
+        <receiver android:name="com.harvard.notificationmodule.AlarmReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.action.DISPLAY_NOTIFICATION" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name="com.harvard.offlinemodule.auth.StubContentProvider"
+            android:authorities="@string/sync_provider"
+            android:exported="false"
+            android:syncable="true"
+            tools:replace="android:authorities" />
+
+        <service android:name="com.harvard.offlinemodule.auth.StubAuthenticatorService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accounts.AccountAuthenticator" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accounts.AccountAuthenticator"
+                android:resource="@xml/authenticator" />
+        </service>
+        <service
+            android:name="com.harvard.offlinemodule.auth.SyncAdapterService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.content.SyncAdapter" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.content.SyncAdapter"
+                android:resource="@xml/syncadapter" />
+        </service>
+        <service android:name="com.harvard.utils.ActiveTaskService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.harvard.ActiveTask" />
+            </intent-filter>
+        </service>
+        <service android:name="com.harvard.studyappmodule.CalculateRunHoldService" />
+
+        <receiver android:name="com.harvard.utils.AlarmService" />
+
+        <activity
+            android:name="com.harvard.studyappmodule.FilterActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"
+            android:windowSoftInputMode="stateHidden" />
+
+        <receiver android:name="com.harvard.utils.BootCompleteListener"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+        <receiver android:name="com.harvard.utils.NetworkChangeReceiver"
+            tools:ignore="Instantiatable"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.net.conn.CONNECTIVITY_CHANGE" />
+            </intent-filter>
+        </receiver>
+        <activity
+            android:name="com.harvard.eligibilitymodule.NotEligibleActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"></activity>
+        <activity
+            android:name="com.harvard.eligibilitymodule.EligibleActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"></activity>
+        <activity
+            android:name="com.harvard.eligibilitymodule.ComprehensionSuccessActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"></activity>
+        <activity
+            android:name="com.harvard.eligibilitymodule.ComprehensionFailureActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"></activity>
+        <activity
+            android:name="com.harvard.studyappmodule.consent.consentsharingstepcustom.LoadMoreActivity"
+            android:configChanges="screenLayout|orientation"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.BackboneApp"></activity>
+        <service android:name = "com.harvard.VersionCheckerService"/>
+    </application>
+
+</manifest>

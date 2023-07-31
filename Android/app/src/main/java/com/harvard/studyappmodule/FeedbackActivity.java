@@ -1,0 +1,269 @@
+/*
+ * Copyright © 2017-2019 Harvard Pilgrim Health Care Institute (HPHCI) and its Contributors.
+ * Copyright 2020 Google LLC
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+ * associated documentation files (the "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial
+ * portions of the Software.
+ *
+ * Funding Source: Food and Drug Administration (“Funding Agency”) effective 18 September 2014 as Contract no. HHSF22320140030I/HHSF22301006T (the “Prime Contract”).
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+package com.harvard.studyappmodule;
+
+import android.app.Activity;
+import android.content.IntentFilter;
+import android.net.ConnectivityManager;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.AppCompatEditText;
+import androidx.appcompat.widget.AppCompatTextView;
+
+import com.harvard.R;
+import com.harvard.ServiceManager;
+import com.harvard.studyappmodule.events.ContactUsEvent;
+import com.harvard.studyappmodule.studymodel.ReachOut;
+import com.harvard.utils.AppController;
+import com.harvard.utils.CustomFirebaseAnalytics;
+import com.harvard.utils.Logger;
+import com.harvard.utils.NetworkChangeReceiver;
+import com.harvard.utils.Urls;
+import com.harvard.webservicemodule.apihelper.ApiCall;
+import com.harvard.webservicemodule.apihelper.NetworkRequest;
+import com.harvard.webservicemodule.apihelper.ParticipantDataStoreAPIInterface;
+import com.harvard.webservicemodule.apihelper.UrlTypeConstants;
+import com.harvard.webservicemodule.events.ParticipantDatastoreConfigEvent;
+
+import java.util.HashMap;
+
+public class FeedbackActivity extends AppCompatActivity implements ApiCall.OnAsyncRequestComplete,
+        NetworkChangeReceiver.NetworkChangeCallback {
+    private AppCompatTextView title;
+    private AppCompatTextView feedbackText;
+    private AppCompatEditText feedbackEdittext;
+    private AppCompatEditText subject;
+    private RelativeLayout backBtn;
+    private AppCompatTextView submitButton;
+    private static final int FEEDBACK = 16;
+    private CustomFirebaseAnalytics analyticsInstance;
+    private TextView offlineIndicatior;
+    private NetworkChangeReceiver networkChangeReceiver;
+    private ParticipantDataStoreAPIInterface participantDataStoreAPIInterface;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_feedback);
+        analyticsInstance = CustomFirebaseAnalytics.getInstance(this);
+        initializeXmlId();
+        setFont();
+        bindEvents();
+    }
+
+    private void initializeXmlId() {
+        backBtn = (RelativeLayout) findViewById(R.id.backBtn);
+        networkChangeReceiver = new NetworkChangeReceiver(this);
+        title = (AppCompatTextView) findViewById(R.id.title);
+        feedbackText = (AppCompatTextView) findViewById(R.id.feedback_label);
+        feedbackEdittext = (AppCompatEditText) findViewById(R.id.edittxt_feedback);
+        subject = (AppCompatEditText) findViewById(R.id.subject);
+        submitButton = (AppCompatTextView) findViewById(R.id.submitButton);
+        offlineIndicatior = findViewById(R.id.offlineIndicatior);
+    }
+
+    private void setFont() {
+        try {
+            title.setTypeface(AppController.getTypeface(FeedbackActivity.this, "medium"));
+            feedbackText.setTypeface(AppController.getTypeface(FeedbackActivity.this, "regular"));
+
+            feedbackEdittext.setTypeface(AppController.getTypeface(FeedbackActivity.this, "regular"));
+
+        } catch (Exception e) {
+            Logger.log(e);
+        }
+    }
+
+    private void bindEvents() {
+        backBtn.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        Bundle eventProperties = new Bundle();
+                        eventProperties.putString(
+                                CustomFirebaseAnalytics.Param.BUTTON_CLICK_REASON,
+                                getString(R.string.feedback_back));
+                        analyticsInstance.logEvent(
+                                CustomFirebaseAnalytics.Event.ADD_BUTTON_CLICK, eventProperties);
+                        try {
+                            InputMethodManager inputMethodManager =
+                                    (InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE);
+                            inputMethodManager.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+                        } catch (Exception e) {
+                            Logger.log(e);
+                        }
+                        finish();
+                    }
+                });
+        submitButton.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        Bundle eventProperties = new Bundle();
+                        eventProperties.putString(
+                                CustomFirebaseAnalytics.Param.BUTTON_CLICK_REASON,
+                                getString(R.string.feedback_submit));
+                        analyticsInstance.logEvent(
+                                CustomFirebaseAnalytics.Event.ADD_BUTTON_CLICK, eventProperties);
+                        if (subject.getText().toString().equalsIgnoreCase("")) {
+                            Toast.makeText(
+                                            FeedbackActivity.this,
+                                            getResources().getString(R.string.subject_empty),
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+                        } else if (feedbackEdittext.getText().toString().equalsIgnoreCase("")) {
+                            Toast.makeText(
+                                            FeedbackActivity.this,
+                                            getResources().getString(R.string.feedback_empty),
+                                            Toast.LENGTH_SHORT)
+                                    .show();
+                        } else {
+                            callmFeedbackWebservice();
+                        }
+                    }
+                });
+    }
+
+    private void callmFeedbackWebservice() {
+        AppController.getHelperProgressDialog().showProgress(FeedbackActivity.this, "", "", false);
+        ContactUsEvent contactUsEvent = new ContactUsEvent();
+        HashMap<String, String> params = new HashMap<>();
+        params.put("subject", subject.getText().toString());
+        params.put("body", feedbackEdittext.getText().toString());
+    /*ParticipantDatastoreConfigEvent participantDatastoreConfigEvent =
+        new ParticipantDatastoreConfigEvent(
+            "post",
+            Urls.FEEDBACK,
+            FEEDBACK,
+            FeedbackActivity.this,
+            ReachOut.class,
+            params,
+            null,
+            null,
+            false,
+            this);
+
+    contactUsEvent.setParticipantDatastoreConfigEvent(participantDatastoreConfigEvent);
+    StudyModulePresenter studyModulePresenter = new StudyModulePresenter();
+    studyModulePresenter.performContactUsEvent(contactUsEvent);*/
+        participantDataStoreAPIInterface = new ServiceManager().createService(ParticipantDataStoreAPIInterface.class, UrlTypeConstants.ParticipantDataStore);
+        NetworkRequest.performAsyncRequest(participantDataStoreAPIInterface
+                        .sendFeedback(params),
+                (data) -> {
+                    try {
+                        setFeedbackResponse(data);
+                    } catch (Exception e) {
+                        Log.e("TAG", e.getMessage());
+                    }
+                }, (error) -> {
+                    (FeedbackActivity.this).runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            AppController.getHelperProgressDialog().dismissDialog();
+                            int code = AppController.getErrorCode(error);
+                            String errormsg = AppController.getErrorMessage(error);
+                            if (code == 401) {
+                                Toast.makeText(FeedbackActivity.this, errormsg, Toast.LENGTH_SHORT).show();
+                                AppController.getHelperSessionExpired(FeedbackActivity.this, errormsg);
+                            } else {
+                                Toast.makeText(FeedbackActivity.this, errormsg, Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    });
+                });
+    }
+
+    private void setFeedbackResponse(ReachOut data) {
+        (FeedbackActivity.this).runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+
+                if (data != null) {
+                    AppController.getHelperProgressDialog().dismissDialog();
+                    Toast.makeText(
+                                    FeedbackActivity.this,
+                                    getResources().getString(R.string.feedback_submit_success),
+                                    Toast.LENGTH_SHORT)
+                            .show();
+                    finish();
+                }
+            }
+        });
+    }
+
+    @Override
+    public <T> void asyncResponse(T response, int responseCode) {
+        if (responseCode == FEEDBACK) {
+            if (response != null) {
+                AppController.getHelperProgressDialog().dismissDialog();
+                Toast.makeText(
+                                FeedbackActivity.this,
+                                getResources().getString(R.string.feedback_submit_success),
+                                Toast.LENGTH_SHORT)
+                        .show();
+                finish();
+            }
+        }
+    }
+
+    @Override
+    public void asyncResponseFailure(int responseCode, String errormsg, String statusCode) {
+        AppController.getHelperProgressDialog().dismissDialog();
+        if (statusCode.equalsIgnoreCase("401")) {
+            Toast.makeText(FeedbackActivity.this, errormsg, Toast.LENGTH_SHORT).show();
+            AppController.getHelperSessionExpired(FeedbackActivity.this, errormsg);
+        } else {
+            if (responseCode == FEEDBACK) {
+                Toast.makeText(FeedbackActivity.this, errormsg, Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    @Override
+    public void onNetworkChanged(boolean status) {
+        if (!status) {
+            offlineIndicatior.setVisibility(View.VISIBLE);
+            submitButton.setClickable(false);
+            submitButton.setAlpha(0.5F);
+        } else {
+            offlineIndicatior.setVisibility(View.GONE);
+            submitButton.setClickable(true);
+            submitButton.setAlpha(1F);
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        IntentFilter intentFilter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
+        registerReceiver(networkChangeReceiver, intentFilter);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (networkChangeReceiver != null) {
+            unregisterReceiver(networkChangeReceiver);
+        }
+    }
+}

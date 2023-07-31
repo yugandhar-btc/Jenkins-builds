@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- Update `app_name` with a user-facing name for your application, for example, "Demo App"-->
+<!-- Update `package_name` with the `ApplicationID` that you specified in `Android/app/build.gradle` -->
+<!DOCTYPE resources [
+    <!ENTITY app_name "BubsCare">
+    <!ENTITY package_name "com.validcare.bubs">
+    ]>
+
+<resources>
+    <!--The following strings must be updated-->
+    <!-- Update `google_maps_key` with your Google Maps API key (see https://developers.google.com/maps/documentation/android-sdk/get-api-key) -->
+    <string name="google_maps_Key">YOUR_MAPS_KEY</string>
+
+    <!-- Update `deeplink_host` with a value that defines your deeplink URL (do not include app:// or context-path) -->
+    <!-- For example, a `deeplink_host` value of "subdomain.domain" would establish "app://subdomain.domain/mystudies" as the deeplink URL -->
+    <!-- Use deeplink_host set to package_name to make it unique across multiple apps. This would establish "app://{package_name}/mystudies" as the deeplink URL -->
+    <string name="deeplink_host">&package_name;</string>
+
+    <!--The following strings may be customized as desired-->
+    <string name="app_name">&app_name;</string>
+    <string name="poweredby">Powered by Validcare</string>
+    <string name="website"></string>
+    <string name="websitetxt"></string>
+
+    <string name="get_started">Get started</string>
+    <string name="gateway_welcome">Welcome to BubsCare</string>
+    <string name="gateway_des">Creating new generations of happy, joyful bubs. </string>
+
+    <string name="gateway_welcome1">Leveraging the power of technology for research</string>
+    <string name="gateway_des1">Thank you for participating in groundbreaking  research that will allow us to improve the health and wellness of people across the world.</string>
+
+    <string name="delete_account_content">You have chosen to delete your &app_name; account. This will result in withdrawal from all your studies.</string>
+    <string name="delete_message">Are you sure you want to delete your account? </string>
+    <string name="studie_your_enrolled">It\'s been a while since you\'ve contributed. Please consider continuing your participation in important study for which you\'re enrolled. </string>
+    <string name="termsurl">https://validcare.com/terms-of-use/</string>
+    <string name="privacyurl">https://validcare.com/study-privacy-policy/</string>
+    <string name="view_consent">View consent</string>
+    <string name="visit_website">Visit website</string>
+    <string name="join_study">Participate</string>
+    <string name="clientToken">clientToken</string>
+    <string name="account_type">&package_name;.offlineModule.auth.syncadapterexample</string>
+    <string name="sync_provider">&package_name;.offlineModule.auth.syncadapterexample.provider</string>
+    <string name="FileProvider_authorities">&package_name;.myfileprovider</string>
+</resources>

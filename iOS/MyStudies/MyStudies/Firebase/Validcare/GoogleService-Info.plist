@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>605888383744-3st8gdh6rgautnpj9j3nlrlubscgs07h.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.605888383744-3st8gdh6rgautnpj9j3nlrlubscgs07h</string>
+	<key>API_KEY</key>
+	<string>AIzaSyAFmDj2xj2pnT9mWTko0qaex44_Patb7Ek</string>
+	<key>GCM_SENDER_ID</key>
+	<string>605888383744</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.validcare.studies</string>
+	<key>PROJECT_ID</key>
+	<string>vc-prod-firebase</string>
+	<key>STORAGE_BUCKET</key>
+	<string>vc-prod-firebase.appspot.com</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:605888383744:ios:576f462c2a44e21ee281e5</string>
+</dict>
+</plist>

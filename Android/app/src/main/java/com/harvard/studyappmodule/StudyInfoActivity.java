@@ -1,0 +1,1582 @@
+/*
+ * Copyright © 2017-2019 Harvard Pilgrim Health Care Institute (HPHCI) and its Contributors.
+ * Copyright 2020-2021 Google LLC
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+ * associated documentation files (the "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial
+ * portions of the Software.
+ *
+ * Funding Source: Food and Drug Administration (“Funding Agency”) effective 18 September 2014 as Contract no. HHSF22320140030I/HHSF22301006T (the “Prime Contract”).
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ */
+
+package com.harvard.studyappmodule;
+
+import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.graphics.BitmapFactory;
+import android.net.ConnectivityManager;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
+import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
+import android.widget.TextView;
+import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.AppCompatTextView;
+import androidx.browser.customtabs.CustomTabsIntent;
+import androidx.viewpager.widget.ViewPager;
+import com.google.gson.ExclusionStrategy;
+import com.google.gson.FieldAttributes;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.TypeAdapter;
+import com.google.gson.reflect.TypeToken;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
+import com.harvard.AppConfig;
+import com.harvard.R;
+import com.harvard.ServiceManager;
+import com.harvard.WebViewActivity;
+import com.harvard.eligibilitymodule.CustomViewTaskActivity;
+import com.harvard.eligibilitymodule.StepsBuilder;
+import com.harvard.gatewaymodule.CircleIndicator;
+import com.harvard.offlinemodule.model.OfflineData;
+import com.harvard.storagemodule.DbServiceSubscriber;
+import com.harvard.studyappmodule.activitybuilder.model.servicemodel.Steps;
+import com.harvard.studyappmodule.consent.ConsentBuilder;
+import com.harvard.studyappmodule.consent.CustomConsentViewTaskActivity;
+import com.harvard.studyappmodule.consent.model.Consent;
+import com.harvard.studyappmodule.consent.model.CorrectAnswerString;
+import com.harvard.studyappmodule.consent.model.EligibilityConsent;
+import com.harvard.studyappmodule.events.GetUserStudyInfoEvent;
+import com.harvard.studyappmodule.studymodel.ConsentDocumentData;
+import com.harvard.studyappmodule.studymodel.StudyHome;
+import com.harvard.studyappmodule.studymodel.StudyList;
+import com.harvard.usermodule.UserModulePresenter;
+import com.harvard.usermodule.event.GetPreferenceEvent;
+import com.harvard.usermodule.model.Apps;
+import com.harvard.usermodule.webservicemodel.LoginData;
+import com.harvard.usermodule.webservicemodel.Studies;
+import com.harvard.usermodule.webservicemodel.StudyData;
+import com.harvard.utils.AppController;
+import com.harvard.utils.CustomFirebaseAnalytics;
+import com.harvard.utils.Logger;
+import com.harvard.utils.NetworkChangeReceiver;
+import com.harvard.utils.SharedPreferenceHelper;
+import com.harvard.utils.Urls;
+import com.harvard.webservicemodule.apihelper.ApiCall;
+import com.harvard.webservicemodule.apihelper.ConnectionDetector;
+import com.harvard.webservicemodule.apihelper.EnrollmentDataStoreInterface;
+import com.harvard.webservicemodule.apihelper.HttpRequest;
+import com.harvard.webservicemodule.apihelper.NetworkRequest;
+import com.harvard.webservicemodule.apihelper.Responsemodel;
+import com.harvard.webservicemodule.apihelper.StudyDataStoreAPIInterface;
+import com.harvard.webservicemodule.apihelper.UrlTypeConstants;
+import com.harvard.webservicemodule.events.ParticipantEnrollmentDatastoreConfigEvent;
+import com.harvard.webservicemodule.events.StudyDatastoreConfigEvent;
+import io.realm.Realm;
+import io.realm.RealmList;
+import io.realm.RealmObject;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import rx.Subscription;
+
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import org.researchstack.backbone.step.Step;
+import org.researchstack.backbone.task.OrderedTask;
+import org.researchstack.backbone.task.Task;
+
+public class StudyInfoActivity extends AppCompatActivity
+    implements ApiCall.OnAsyncRequestComplete, NetworkChangeReceiver.NetworkChangeCallback {
+  private static final int STUDY_INFO = 10;
+  private static final int UPDATE_PREFERENCES = 11;
+  private static final int GET_CONSENT_DOC = 12;
+  private static final int JOIN_ACTION_SIGIN = 100;
+  private static final int GET_PREFERENCES = 101;
+  private static final int CONSENT_RESPONSECODE = 115;
+  private RelativeLayout backBtn;
+  private String studyId = "";
+  private String status = "";
+  private String studyStatus = "";
+  private String position = "";
+  private String title = "";
+  private String enroll = "";
+  private AppCompatTextView joinButton;
+  private StudyHome studyHome;
+  private ConsentDocumentData consentDocumentData;
+  private AppCompatTextView visitWebsiteButton;
+  private AppCompatTextView learnMoreButton;
+  private AppCompatTextView consentLayButton;
+  private LinearLayout bottomBar;
+  private LinearLayout bottomBar1;
+  private RelativeLayout consentLay;
+  private boolean aboutThisStudy;
+  private int deleteIndexNumberDb;
+  private DbServiceSubscriber dbServiceSubscriber;
+  private String eligibilityType = "";
+  private Realm realm;
+  private EligibilityConsent eligibilityConsent;
+  private RealmList<Studies> userPreferenceStudies;
+  private CustomFirebaseAnalytics analyticsInstance;
+  private TextView offlineIndicatior;
+  private NetworkChangeReceiver networkChangeReceiver;
+  private StudyDataStoreAPIInterface apiInterface;
+  private Subscription mSBNetworkSubscriptionl;
+  private EnrollmentDataStoreInterface enrollmentDataStoreInterface;
+  private StudyData studies;
+  private String errormsg;
+  private int code;
+
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    setContentView(R.layout.activity_study_info);
+    dbServiceSubscriber = new DbServiceSubscriber();
+    realm = AppController.getRealmobj(this);
+    analyticsInstance = CustomFirebaseAnalytics.getInstance(this);
+    networkChangeReceiver = new NetworkChangeReceiver(this);
+
+    initializeXmlId();
+    setFont();
+    bindEvents();
+
+    try {
+      studyId = getIntent().getStringExtra("studyId");
+      status = getIntent().getStringExtra("status");
+      studyStatus = getIntent().getStringExtra("studyStatus");
+      position = getIntent().getStringExtra("position");
+      title = getIntent().getStringExtra("title");
+      enroll = getIntent().getStringExtra("enroll");
+      aboutThisStudy = getIntent().getBooleanExtra("about_this_study", false);
+    } catch (Exception e) {
+      Logger.log(e);
+    }
+
+    AppController.getHelperProgressDialog().showProgress(StudyInfoActivity.this, "", "", false);
+    callGetStudyInfoWebservice();
+
+    if (status.equalsIgnoreCase(getString(R.string.closed))) {
+      joinButton.setVisibility(View.GONE);
+    }
+
+    if (AppConfig.AppType.equalsIgnoreCase(getString(R.string.app_standalone))) {
+      backBtn.setVisibility(View.VISIBLE);
+    }
+  }
+
+  private void initializeXmlId() {
+    backBtn = (RelativeLayout) findViewById(R.id.backBtn);
+    joinButton = (AppCompatTextView) findViewById(R.id.joinButton);
+    visitWebsiteButton = (AppCompatTextView) findViewById(R.id.mVisitWebsiteButton);
+    learnMoreButton = (AppCompatTextView) findViewById(R.id.mLernMoreButton);
+    consentLayButton = (AppCompatTextView) findViewById(R.id.consentLayButton);
+    bottomBar = (LinearLayout) findViewById(R.id.bottom_bar);
+    bottomBar1 = (LinearLayout) findViewById(R.id.bottom_bar1);
+    consentLay = (RelativeLayout) findViewById(R.id.consentLay);
+    offlineIndicatior = findViewById(R.id.offlineIndicatior);
+  }
+
+  private void setFont() {
+    joinButton.setTypeface(AppController.getTypeface(this, "regular"));
+    visitWebsiteButton.setTypeface(AppController.getTypeface(StudyInfoActivity.this, "regular"));
+    learnMoreButton.setTypeface(AppController.getTypeface(StudyInfoActivity.this, "regular"));
+    consentLayButton.setTypeface(AppController.getTypeface(StudyInfoActivity.this, "regular"));
+  }
+
+  private void bindEvents() {
+    backBtn.setOnClickListener(
+        new View.OnClickListener() {
+          @Override
+          public void onClick(View view) {
+            Bundle eventProperties = new Bundle();
+            eventProperties.putString(
+                CustomFirebaseAnalytics.Param.BUTTON_CLICK_REASON,
+                getString(R.string.study_info_back));
+            analyticsInstance.logEvent(
+                CustomFirebaseAnalytics.Event.ADD_BUTTON_CLICK, eventProperties);
+            backClicked();
+          }
+        });
+
+    joinButton.setOnClickListener(
+        new View.OnClickListener() {
+          @Override
+          public void onClick(View view) {
+            Bundle eventProperties = new Bundle();
+            String studyStatusCheck = "";
+            eventProperties.putString(
+                CustomFirebaseAnalytics.Param.BUTTON_CLICK_REASON, getString(R.string.join_study));
+            analyticsInstance.logEvent(
+                CustomFirebaseAnalytics.Event.ADD_BUTTON_CLICK, eventProperties);
+            if (AppController.getHelperSharedPreference()
+                .readPreference(
+                    StudyInfoActivity.this, getResources().getString(R.string.userid), "")
+                .equalsIgnoreCase("")) {
+              SharedPreferenceHelper.writePreference(
+                  StudyInfoActivity.this, getString(R.string.loginflow), "StudyInfo");
+              SharedPreferenceHelper.writePreference(
+                  StudyInfoActivity.this, getString(R.string.logintype), "signIn");
+
+              SharedPreferenceHelper.writePreference(
+                  StudyInfoActivity.this,
+                  "login_studyinfo_studyId",
+                  getIntent().getStringExtra("studyId"));
+              SharedPreferenceHelper.writePreference(
+                  StudyInfoActivity.this,
+                  "login_studyinfo_status",
+                  getIntent().getStringExtra("status"));
+              SharedPreferenceHelper.writePreference(
+                  StudyInfoActivity.this,
+                  "login_studyinfo_studyStatus",
+                  getIntent().getStringExtra("studyStatus"));
+              SharedPreferenceHelper.writePreference(
+                  StudyInfoActivity.this,
+                  "login_studyinfo_position",
+                  getIntent().getStringExtra("position"));
+              SharedPreferenceHelper.writePreference(
+                  StudyInfoActivity.this,
+                  "login_studyinfo_title",
+                  getIntent().getStringExtra("title"));
+              SharedPreferenceHelper.writePreference(
+                  StudyInfoActivity.this,
+                  "login_studyinfo_bookmark",
+                  "" + getIntent().getBooleanExtra("bookmark", false));
+              SharedPreferenceHelper.writePreference(
+                  StudyInfoActivity.this,
+                  "login_studyinfo_enroll",
+                  getIntent().getStringExtra("enroll"));
+              SharedPreferenceHelper.writePreference(
+                  StudyInfoActivity.this,
+                  "login_studyinfo_about_this_study",
+                  "" + getIntent().getBooleanExtra("about_this_study", false));
+
+              CustomTabsIntent customTabsIntent =
+                  new CustomTabsIntent.Builder()
+                      .setToolbarColor(getResources().getColor(R.color.colorAccent))
+                      .setShowTitle(true)
+                      .setCloseButtonIcon(
+                          BitmapFactory.decodeResource(getResources(), R.drawable.backeligibility))
+                      .setStartAnimations(
+                          StudyInfoActivity.this, R.anim.slide_in_right, R.anim.slide_out_left)
+                      .setExitAnimations(
+                          StudyInfoActivity.this, R.anim.slide_in_left, R.anim.slide_out_right)
+                      .build();
+              Apps apps = dbServiceSubscriber.getApps(realm);
+              customTabsIntent.intent.setData(
+                  Uri.parse(
+                      Urls.LOGIN_URL
+                          .replace("$FromEmail", apps.getFromEmail())
+                          .replace("$SupportEmail", apps.getSupportEmail())
+                          .replace("$AppName", apps.getAppName())
+                          .replace("$ContactEmail", apps.getContactUsEmail())));
+              startActivity(customTabsIntent.intent);
+            } else {
+              if (userPreferenceStudies != null) {
+                for (int i = 0; i < userPreferenceStudies.size(); i++) {
+                  if (userPreferenceStudies.get(i).getStudyId().equalsIgnoreCase(studyId)) {
+                    studyStatusCheck = userPreferenceStudies.get(i).getStatus();
+                  }
+                }
+              }
+              if (studyStatusCheck.equalsIgnoreCase("enrolled")) {
+                new CallConsentMetaData(false).execute();
+              } else {
+                new CallConsentMetaData(true).execute();
+              }
+            }
+          }
+        });
+
+    visitWebsiteButton.setOnClickListener(
+        new View.OnClickListener() {
+          @Override
+          public void onClick(View view) {
+            Bundle eventProperties = new Bundle();
+            eventProperties.putString(
+                CustomFirebaseAnalytics.Param.BUTTON_CLICK_REASON,
+                getString(R.string.visit_website));
+            analyticsInstance.logEvent(
+                CustomFirebaseAnalytics.Event.ADD_BUTTON_CLICK, eventProperties);
+            try {
+              Intent browserIntent =
+                  new Intent(Intent.ACTION_VIEW, Uri.parse(studyHome.getStudyWebsite()));
+              startActivity(browserIntent);
+            } catch (Exception e) {
+              Logger.log(e);
+            }
+          }
+        });
+    learnMoreButton.setOnClickListener(
+        new View.OnClickListener() {
+          @Override
+          public void onClick(View view) {
+            Bundle eventProperties = new Bundle();
+            eventProperties.putString(
+                CustomFirebaseAnalytics.Param.BUTTON_CLICK_REASON,
+                getString(R.string.view_consent));
+            analyticsInstance.logEvent(
+                CustomFirebaseAnalytics.Event.ADD_BUTTON_CLICK, eventProperties);
+            try {
+              Intent intent = new Intent(StudyInfoActivity.this, WebViewActivity.class);
+              intent.putExtra("consent", consentDocumentData.getConsent().getContent());
+              intent.putExtra("type", "text");
+              startActivity(intent);
+            } catch (Exception e) {
+              Logger.log(e);
+            }
+          }
+        });
+  }
+
+  private void backClicked() {
+    if (getIntent().getStringExtra("flow") != null
+        && getIntent().getStringExtra("flow").equalsIgnoreCase("login_callback")) {
+      if (AppConfig.AppType.equalsIgnoreCase(getString(R.string.app_gateway))) {
+        Intent intent = new Intent(StudyInfoActivity.this, StudyActivity.class);
+        ComponentName cn = intent.getComponent();
+        Intent mainIntent = Intent.makeRestartActivityTask(cn);
+        startActivity(mainIntent);
+        finish();
+      } else {
+        Intent intent = new Intent(StudyInfoActivity.this, StandaloneActivity.class);
+        ComponentName cn = intent.getComponent();
+        Intent mainIntent = Intent.makeRestartActivityTask(cn);
+        startActivity(mainIntent);
+        finish();
+      }
+    } else {
+      Intent intent = new Intent();
+      intent.putExtra("position", position);
+      intent.putExtra("status", status);
+      intent.putExtra("studyId", studyId);
+      intent.putExtra("action", "refresh");
+      setResult(Activity.RESULT_OK, intent);
+      finish();
+    }
+  }
+
+  private void joinStudy() {
+    if (enroll.equalsIgnoreCase("false")) {
+      Toast.makeText(getApplication(), R.string.study_no_enroll, Toast.LENGTH_SHORT).show();
+    } else if (status.equalsIgnoreCase(StudyFragment.PAUSED)) {
+      Toast.makeText(getApplication(), R.string.study_paused, Toast.LENGTH_SHORT).show();
+    } else {
+      if (eligibilityConsent.getEligibility().getType().equalsIgnoreCase("token")) {
+        Intent intent = new Intent(StudyInfoActivity.this, EligibilityEnrollmentActivity.class);
+        intent.putExtra("enrollmentDesc", eligibilityConsent.getEligibility().getTokenTitle());
+        intent.putExtra("title", title);
+        intent.putExtra("studyId", studyId);
+        intent.putExtra("eligibility", "token");
+        intent.putExtra("type", "join");
+        startActivity(intent);
+      } else if (eligibilityConsent.getEligibility().getType().equalsIgnoreCase("test")) {
+
+        RealmList<Steps> stepsRealmList = eligibilityConsent.getEligibility().getTest();
+        StepsBuilder stepsBuilder = new StepsBuilder(this, stepsRealmList, false);
+        OrderedTask task = new OrderedTask("Test", stepsBuilder.getsteps());
+
+        Intent intent =
+            CustomViewTaskActivity.newIntent(
+                this,
+                task,
+                "",
+                studyId,
+                eligibilityConsent.getEligibility(),
+                title,
+                "",
+                "",
+                "test",
+                "join");
+        startActivity(intent);
+
+      } else {
+        Intent intent = new Intent(StudyInfoActivity.this, EligibilityEnrollmentActivity.class);
+        intent.putExtra("enrollmentDesc", eligibilityConsent.getEligibility().getTokenTitle());
+        intent.putExtra("title", title);
+        intent.putExtra("studyId", studyId);
+        intent.putExtra("eligibility", "combined");
+        intent.putExtra("type", "join");
+        startActivityForResult(intent, 12345);
+      }
+    }
+  }
+
+  @Override
+  public void onNetworkChanged(boolean status) {
+    if (!status) {
+      offlineIndicatior.setVisibility(View.VISIBLE);
+      joinButton.setClickable(false);
+      joinButton.setAlpha(0.5F);
+    } else {
+      offlineIndicatior.setVisibility(View.GONE);
+      joinButton.setClickable(true);
+      joinButton.setAlpha(1F);
+    }
+  }
+
+  private class CallConsentMetaData
+//      extends AsyncTask<String, Void, String>
+  {
+    String response = null;
+    String responseCode = null;
+    Responsemodel responseModel;
+    boolean join;
+
+    public CallConsentMetaData(boolean join) {
+      this.join = join;
+    }
+
+    private void execute() {
+
+      AppController.getHelperProgressDialog().showProgress(StudyInfoActivity.this, "", "", false);
+
+//      executor.execute(new Runnable() {
+//        @Override
+//        public void run() {
+          ConnectionDetector connectionDetector = new ConnectionDetector(StudyInfoActivity.this);
+
+          if (connectionDetector.isConnectingToInternet()) {
+            apiInterface.getEligibilityConsnet(studyId).enqueue(new Callback<EligibilityConsent>() {
+              @Override
+              public void onResponse(Call<EligibilityConsent> call, Response<EligibilityConsent> responseData) {
+                Log.e("check","data is "+responseData.body());
+                responseCode = String.valueOf(responseData.code());
+                if (responseCode.equalsIgnoreCase("0") &&
+                    responseData.message().equalsIgnoreCase("timeout")) {
+                  AppController.getHelperProgressDialog().dismissDialog();
+                  Toast.makeText(
+                          StudyInfoActivity.this,
+                          getResources().getString(R.string.connection_timeout),
+                          Toast.LENGTH_SHORT)
+                      .show();
+                } else if (responseCode.equalsIgnoreCase("0") &&
+                    responseData.message().equalsIgnoreCase("")) {
+                  response = "error";
+                } else if (Integer.parseInt(responseCode) >= 201
+                    && Integer.parseInt(responseCode) < 300
+                    && responseData.message().equalsIgnoreCase("")) {
+                  response = "No data";
+                } else if (Integer.parseInt(responseCode) >= 400
+                    && Integer.parseInt(responseCode) < 500
+                    && responseData.message().equalsIgnoreCase("http_not_ok")) {
+                  response = "client error";
+                } else if (Integer.parseInt(responseCode) >= 500
+                    && Integer.parseInt(responseCode) < 600
+                    && responseData.message().equalsIgnoreCase("http_not_ok")) {
+                  response = "server error";
+                } else if (responseData.code() == 401) {
+                  AppController.getHelperProgressDialog().dismissDialog();
+                  Toast.makeText(StudyInfoActivity.this, "session expired", Toast.LENGTH_LONG).show();
+                  AppController.getHelperSessionExpired(StudyInfoActivity.this, "session expired");
+                } else if (responseData.code() == 200
+                    && responseData.body() != null) {
+                  AppController.getHelperProgressDialog().dismissDialog();
+                  Log.e("check","data is "+responseData.body());
+                  eligibilityConsent = responseData.body();
+                  if (eligibilityConsent != null) {
+                    eligibilityConsent.setStudyId(studyId);
+                    saveConsentToDB(eligibilityConsent);
+                    if (join) {
+                      joinStudy();
+                    } else {
+                      if (userPreferenceStudies != null) {
+                        if (userPreferenceStudies.size() != 0) {
+                          ConsentDocumentData consentDocumentData =
+                              dbServiceSubscriber.getConsentDocumentFromDB(studyId, realm);
+                          boolean studyIdPresent = false;
+                          for (int i = 0; i < userPreferenceStudies.size(); i++) {
+                            if (userPreferenceStudies.get(i).getStudyId().equalsIgnoreCase(studyId)) {
+                              studyIdPresent = true;
+                              if (userPreferenceStudies
+                                  .get(i)
+                                  .getStatus()
+                                  .equalsIgnoreCase(StudyFragment.IN_PROGRESS)) {
+                                if (!consentDocumentData
+                                    .getConsent()
+                                    .getVersion()
+                                    .equalsIgnoreCase(userPreferenceStudies.get(i).getUserStudyVersion())) {
+                                  startConsent(
+                                      eligibilityConsent.getConsent(),
+                                      eligibilityConsent.getEligibility().getType());
+                                } else {
+                                  Intent intent = new Intent(StudyInfoActivity.this, SurveyActivity.class);
+                                  intent.putExtra("studyId", studyId);
+                                  startActivity(intent);
+                                }
+                              } else {
+                                joinStudy();
+                              }
+                            }
+                          }
+                          if (!studyIdPresent) {
+                            joinStudy();
+                          }
+                        } else {
+                          joinStudy();
+                        }
+                      } else {
+                        Toast.makeText(
+                                StudyInfoActivity.this, R.string.error_retriving_data, Toast.LENGTH_SHORT)
+                            .show();
+                      }
+                    }
+                  } else {
+                    Toast.makeText(StudyInfoActivity.this, R.string.unable_to_parse, Toast.LENGTH_SHORT).show();
+                  }
+                } else {
+                  AppController.getHelperProgressDialog().dismissDialog();
+                  response = getString(R.string.unknown_error);
+                  Toast.makeText(StudyInfoActivity.this, response, Toast.LENGTH_SHORT).show();
+                }
+              }
+
+              @Override
+              public void onFailure(Call<EligibilityConsent> call, Throwable t) {
+                AppController.getHelperProgressDialog().dismissDialog();
+                Log.e("check","error response is "+t.getLocalizedMessage());
+              }
+            });
+          }
+
+//          handler.post(new Runnable() {
+//            @Override
+//            public void run() {
+//              AppController.getHelperProgressDialog().dismissDialog();
+//
+//              if (response != null) {
+//                if (response.equalsIgnoreCase("session expired")) {
+//                  AppController.getHelperProgressDialog().dismissDialog();
+//                  AppController.getHelperSessionExpired(StudyInfoActivity.this, "session expired");
+//                } else if (response.equalsIgnoreCase("timeout")) {
+//                  AppController.getHelperProgressDialog().dismissDialog();
+//                  Toast.makeText(
+//                          StudyInfoActivity.this,
+//                          getResources().getString(R.string.connection_timeout),
+//                          Toast.LENGTH_SHORT)
+//                      .show();
+//                }
+//                else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_OK) {
+//
+//                  Gson gson =
+//                      new GsonBuilder()
+//                          .setExclusionStrategies(
+//                              new ExclusionStrategy() {
+//                                @Override
+//                                public boolean shouldSkipField(FieldAttributes f) {
+//                                  return f.getDeclaringClass().equals(RealmObject.class);
+//                                }
+//
+//                                @Override
+//                                public boolean shouldSkipClass(Class<?> clazz) {
+//                                  return false;
+//                                }
+//                              })
+//                          .registerTypeAdapter(
+//                              new TypeToken<RealmList<CorrectAnswerString>>() {
+//                              }.getType(),
+//                              new TypeAdapter<RealmList<CorrectAnswerString>>() {
+//
+//                                @Override
+//                                public void write(JsonWriter out, RealmList<CorrectAnswerString> value)
+//                                    throws IOException {
+//                                  // Ignore
+//                                }
+//
+//                                @Override
+//                                public RealmList<CorrectAnswerString> read(JsonReader in)
+//                                    throws IOException {
+//                                  RealmList<CorrectAnswerString> list =
+//                                      new RealmList<CorrectAnswerString>();
+//                                  in.beginArray();
+//                                  while (in.hasNext()) {
+//                                    CorrectAnswerString surveyObjectString = new CorrectAnswerString();
+//                                    surveyObjectString.setAnswer(in.nextString());
+//                                    list.add(surveyObjectString);
+//                                  }
+//                                  in.endArray();
+//                                  return list;
+//                                }
+//                              })
+//                          .create();
+//                  eligibilityConsent = gson.fromJson(response, EligibilityConsent.class);
+//                  if (eligibilityConsent != null) {
+//                    eligibilityConsent.setStudyId(studyId);
+//                    saveConsentToDB(eligibilityConsent);
+//
+//                    if (join) {
+//                      joinStudy();
+//                    } else {
+//                      if (userPreferenceStudies != null) {
+//                        if (userPreferenceStudies.size() != 0) {
+//                          ConsentDocumentData consentDocumentData =
+//                              dbServiceSubscriber.getConsentDocumentFromDB(studyId, realm);
+//                          boolean studyIdPresent = false;
+//                          for (int i = 0; i < userPreferenceStudies.size(); i++) {
+//                            if (userPreferenceStudies.get(i).getStudyId().equalsIgnoreCase(studyId)) {
+//                              studyIdPresent = true;
+//                              if (userPreferenceStudies
+//                                  .get(i)
+//                                  .getStatus()
+//                                  .equalsIgnoreCase(StudyFragment.IN_PROGRESS)) {
+//                                if (!consentDocumentData
+//                                    .getConsent()
+//                                    .getVersion()
+//                                    .equalsIgnoreCase(userPreferenceStudies.get(i).getUserStudyVersion())) {
+//                                  startConsent(
+//                                      eligibilityConsent.getConsent(),
+//                                      eligibilityConsent.getEligibility().getType());
+//                                } else {
+//                                  Intent intent = new Intent(StudyInfoActivity.this, SurveyActivity.class);
+//                                  intent.putExtra("studyId", studyId);
+//                                  startActivity(intent);
+//                                }
+//                              } else {
+//                                joinStudy();
+//                              }
+//                            }
+//                          }
+//                          if (!studyIdPresent) {
+//                            joinStudy();
+//                          }
+//                        } else {
+//                          joinStudy();
+//                        }
+//                      } else {
+//                        Toast.makeText(
+//                                StudyInfoActivity.this, R.string.error_retriving_data, Toast.LENGTH_SHORT)
+//                            .show();
+//                      }
+//                    }
+//                  } else {
+//                    Toast.makeText(
+//                            StudyInfoActivity.this, R.string.error_retriving_data, Toast.LENGTH_SHORT)
+//                        .show();
+//                  }
+//                }
+//                else {
+//                  AppController.getHelperProgressDialog().dismissDialog();
+//                  Toast.makeText(
+//                          StudyInfoActivity.this,
+//                          getResources().getString(R.string.unable_to_retrieve_data),
+//                          Toast.LENGTH_SHORT)
+//                      .show();
+//                }
+//              } else {
+//                AppController.getHelperProgressDialog().dismissDialog();
+//                Toast.makeText(
+//                        StudyInfoActivity.this, getString(R.string.unknown_error), Toast.LENGTH_SHORT)
+//                    .show();
+//              }
+//            }
+//          });
+//        }
+//      });
+//      return response;
+//
+//    }
+
+//    @Override
+//    protected String doInBackground(String... params) {
+//      ConnectionDetector connectionDetector = new ConnectionDetector(StudyInfoActivity.this);
+//
+//      String url = Urls.BASE_URL_STUDY_DATASTORE + Urls.CONSENT_METADATA + "?studyId=" + studyId;
+//      if (connectionDetector.isConnectingToInternet()) {
+//        responseModel =
+//            HttpRequest.getRequest(url, new HashMap<String, String>(), "STUDY_DATASTORE");
+//        responseCode = responseModel.getResponseCode();
+//        response = responseModel.getResponseData();
+//        if (responseCode.equalsIgnoreCase("0") && response.equalsIgnoreCase("timeout")) {
+//          response = "timeout";
+//        } else if (responseCode.equalsIgnoreCase("0") && response.equalsIgnoreCase("")) {
+//          response = "error";
+//        } else if (Integer.parseInt(responseCode) >= 201
+//            && Integer.parseInt(responseCode) < 300
+//            && response.equalsIgnoreCase("")) {
+//          response = "No data";
+//        } else if (Integer.parseInt(responseCode) >= 400
+//            && Integer.parseInt(responseCode) < 500
+//            && response.equalsIgnoreCase("http_not_ok")) {
+//          response = "client error";
+//        } else if (Integer.parseInt(responseCode) >= 500
+//            && Integer.parseInt(responseCode) < 600
+//            && response.equalsIgnoreCase("http_not_ok")) {
+//          response = "server error";
+//        } else if (response.equalsIgnoreCase("http_not_ok")) {
+//          response = "Unknown error";
+//        } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_UNAUTHORIZED) {
+//          response = "session expired";
+//        } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_OK
+//            && !response.equalsIgnoreCase("")) {
+//          response = response;
+//        } else {
+//          response = getString(R.string.unknown_error);
+//        }
+//      }
+//      return response;
+//    }
+
+//    @Override
+//    protected void onPostExecute(String result) {
+//      AppController.getHelperProgressDialog().dismissDialog();
+//
+//      if (response != null) {
+//        if (response.equalsIgnoreCase("session expired")) {
+//          AppController.getHelperProgressDialog().dismissDialog();
+//          AppController.getHelperSessionExpired(StudyInfoActivity.this, "session expired");
+//        } else if (response.equalsIgnoreCase("timeout")) {
+//          AppController.getHelperProgressDialog().dismissDialog();
+//          Toast.makeText(
+//                  StudyInfoActivity.this,
+//                  getResources().getString(R.string.connection_timeout),
+//                  Toast.LENGTH_SHORT)
+//              .show();
+//        } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_OK) {
+//
+//          Gson gson =
+//              new GsonBuilder()
+//                  .setExclusionStrategies(
+//                      new ExclusionStrategy() {
+//                        @Override
+//                        public boolean shouldSkipField(FieldAttributes f) {
+//                          return f.getDeclaringClass().equals(RealmObject.class);
+//                        }
+//
+//                        @Override
+//                        public boolean shouldSkipClass(Class<?> clazz) {
+//                          return false;
+//                        }
+//                      })
+//                  .registerTypeAdapter(
+//                      new TypeToken<RealmList<CorrectAnswerString>>() {}.getType(),
+//                      new TypeAdapter<RealmList<CorrectAnswerString>>() {
+//
+//                        @Override
+//                        public void write(JsonWriter out, RealmList<CorrectAnswerString> value)
+//                            throws IOException {
+//                          // Ignore
+//                        }
+//
+//                        @Override
+//                        public RealmList<CorrectAnswerString> read(JsonReader in)
+//                            throws IOException {
+//                          RealmList<CorrectAnswerString> list =
+//                              new RealmList<CorrectAnswerString>();
+//                          in.beginArray();
+//                          while (in.hasNext()) {
+//                            CorrectAnswerString surveyObjectString = new CorrectAnswerString();
+//                            surveyObjectString.setAnswer(in.nextString());
+//                            list.add(surveyObjectString);
+//                          }
+//                          in.endArray();
+//                          return list;
+//                        }
+//                      })
+//                  .create();
+//          eligibilityConsent = gson.fromJson(response, EligibilityConsent.class);
+//          if (eligibilityConsent != null) {
+//            eligibilityConsent.setStudyId(studyId);
+//            saveConsentToDB(eligibilityConsent);
+//
+//            if (join) {
+//              joinStudy();
+//            } else {
+//              if (userPreferenceStudies != null) {
+//                if (userPreferenceStudies.size() != 0) {
+//                  ConsentDocumentData consentDocumentData =
+//                      dbServiceSubscriber.getConsentDocumentFromDB(studyId, realm);
+//                  boolean studyIdPresent = false;
+//                  for (int i = 0; i < userPreferenceStudies.size(); i++) {
+//                    if (userPreferenceStudies.get(i).getStudyId().equalsIgnoreCase(studyId)) {
+//                      studyIdPresent = true;
+//                      if (userPreferenceStudies
+//                          .get(i)
+//                          .getStatus()
+//                          .equalsIgnoreCase(StudyFragment.IN_PROGRESS)) {
+//                        if (!consentDocumentData
+//                            .getConsent()
+//                            .getVersion()
+//                            .equalsIgnoreCase(userPreferenceStudies.get(i).getUserStudyVersion())) {
+//                          startConsent(
+//                              eligibilityConsent.getConsent(),
+//                              eligibilityConsent.getEligibility().getType());
+//                        } else {
+//                          Intent intent = new Intent(StudyInfoActivity.this, SurveyActivity.class);
+//                          intent.putExtra("studyId", studyId);
+//                          startActivity(intent);
+//                        }
+//                      } else {
+//                        joinStudy();
+//                      }
+//                    }
+//                  }
+//                  if (!studyIdPresent) {
+//                    joinStudy();
+//                  }
+//                } else {
+//                  joinStudy();
+//                }
+//              } else {
+//                Toast.makeText(
+//                        StudyInfoActivity.this, R.string.error_retriving_data, Toast.LENGTH_SHORT)
+//                    .show();
+//              }
+//            }
+//          } else {
+//            Toast.makeText(
+//                    StudyInfoActivity.this, R.string.error_retriving_data, Toast.LENGTH_SHORT)
+//                .show();
+//          }
+//        } else {
+//          AppController.getHelperProgressDialog().dismissDialog();
+//          Toast.makeText(
+//                  StudyInfoActivity.this,
+//                  getResources().getString(R.string.unable_to_retrieve_data),
+//                  Toast.LENGTH_SHORT)
+//              .show();
+//        }
+//      } else {
+//        AppController.getHelperProgressDialog().dismissDialog();
+//        Toast.makeText(
+//                StudyInfoActivity.this, getString(R.string.unknown_error), Toast.LENGTH_SHORT)
+//            .show();
+//      }
+//    }
+
+//    @Override
+//    protected void onPreExecute() {
+//      AppController.getHelperProgressDialog().showProgress(StudyInfoActivity.this, "", "", false);
+//    }
+    }
+  }
+
+  private void setErrorMessage(Throwable error, String response, String responseCode) {
+    responseCode = String.valueOf(AppController.getErrorCode(error));
+    response = AppController.getErrorMessage(error);
+    if (responseCode.equalsIgnoreCase("0") && response.equalsIgnoreCase("timeout")) {
+      response = "timeout";
+    } else if (responseCode.equalsIgnoreCase("0") && response.equalsIgnoreCase("")) {
+      response = "error";
+    } else if (Integer.parseInt(responseCode) >= 201
+            && Integer.parseInt(responseCode) < 300
+            && response.equalsIgnoreCase("")) {
+      response = "No data";
+    } else if (Integer.parseInt(responseCode) >= 400
+            && Integer.parseInt(responseCode) < 500
+            && response.equalsIgnoreCase("http_not_ok")) {
+      response = "client error";
+    } else if (Integer.parseInt(responseCode) >= 500
+            && Integer.parseInt(responseCode) < 600
+            && response.equalsIgnoreCase("http_not_ok")) {
+      response = "server error";
+    } else if (response.equalsIgnoreCase("http_not_ok")) {
+      response = "Unknown error";
+    } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_UNAUTHORIZED) {
+      response = "session expired";
+    } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_OK
+            && !response.equalsIgnoreCase("")) {
+      response = response;
+    } else {
+      response = getString(R.string.unknown_error);
+    }
+  }
+
+  private void saveConsentToDB(EligibilityConsent eligibilityConsent) {
+    realm.beginTransaction();
+    realm.copyToRealmOrUpdate(eligibilityConsent);
+    realm.commitTransaction();
+  }
+
+  @Override
+  public void onBackPressed() {
+    backClicked();
+  }
+
+  @Override
+  protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    super.onActivityResult(requestCode, resultCode, data);
+    if (requestCode == CONSENT_RESPONSECODE) {
+      if (resultCode == RESULT_OK) {
+        Intent intent = new Intent(this, ConsentCompletedActivity.class);
+        intent.putExtra("studyId", studyId);
+        intent.putExtra("title", title);
+        intent.putExtra("eligibility", eligibilityType);
+        intent.putExtra("type", data.getStringExtra(CustomConsentViewTaskActivity.TYPE));
+        // get the encrypted file path
+        intent.putExtra("PdfPath", data.getStringExtra("PdfPath"));
+        startActivity(intent);
+      }
+    } else if (requestCode == JOIN_ACTION_SIGIN) {
+      if (resultCode == RESULT_OK) {
+        loginCallback();
+      }
+    } else if (requestCode == 12345) {
+      if (resultCode == RESULT_OK) {
+        if (eligibilityConsent != null) {
+          RealmList<Steps> stepsRealmList = eligibilityConsent.getEligibility().getTest();
+          StepsBuilder stepsBuilder = new StepsBuilder(this, stepsRealmList, false);
+          OrderedTask task = new OrderedTask("Test", stepsBuilder.getsteps());
+
+          Intent intent =
+              CustomViewTaskActivity.newIntent(
+                  this,
+                  task,
+                  "",
+                  studyId,
+                  eligibilityConsent.getEligibility(),
+                  title,
+                  data.getStringExtra("enrollId"),
+                  data.getStringExtra("siteId"),
+                  "combined",
+                  "join");
+          startActivity(intent);
+        }
+      }
+    }
+  }
+
+  private void loginCallback() {
+    AppController.getHelperProgressDialog().showProgress(StudyInfoActivity.this, "", "", false);
+
+    HashMap<String, String> header = new HashMap();
+    header.put(
+        "Authorization",
+        "Bearer "
+            + AppController.getHelperSharedPreference()
+            .readPreference(
+                StudyInfoActivity.this, getResources().getString(R.string.auth), ""));
+    header.put(
+        "userId",
+        AppController.getHelperSharedPreference()
+            .readPreference(StudyInfoActivity.this, getResources().getString(R.string.userid), ""));
+    header.put("deviceType", android.os.Build.MODEL);
+    header.put("deviceOS", Build.VERSION.RELEASE);
+    header.put("mobilePlatform", "ANDROID");
+    /*ParticipantEnrollmentDatastoreConfigEvent participantEnrollmentDatastoreConfigEvent =
+        new ParticipantEnrollmentDatastoreConfigEvent(
+            "get",
+            Urls.STUDY_STATE,
+            GET_PREFERENCES,
+            StudyInfoActivity.this,
+            StudyData.class,
+            null,
+            header,
+            null,
+            false,
+            this);
+    GetPreferenceEvent getPreferenceEvent = new GetPreferenceEvent();
+    getPreferenceEvent.setParticipantEnrollmentDatastoreConfigEvent(
+        participantEnrollmentDatastoreConfigEvent);
+    UserModulePresenter userModulePresenter = new UserModulePresenter();
+    userModulePresenter.performGetUserPreference(getPreferenceEvent);*/
+    getStudyStateApiCall(header);
+  }
+  private void getStudyStateApiCall(HashMap<String, String> header) {
+    enrollmentDataStoreInterface = new ServiceManager().createService(EnrollmentDataStoreInterface.class, UrlTypeConstants.EnrollmentDataStore);
+    NetworkRequest.performAsyncRequest(enrollmentDataStoreInterface
+            .getStudyState(header),
+        (dataResponse) -> {
+          try {
+            setStudyState(dataResponse);
+          } catch (Exception e) {
+            Log.e("TAG", e.getMessage());
+          }
+
+        }, (error) -> {
+          code = AppController.getErrorCode(error);
+          errormsg = AppController.getErrorMessage(error);
+          AppController.getHelperProgressDialog().dismissDialog();
+          if (code == 401 && errormsg.equalsIgnoreCase("Unauthorized or Invalid token")) {
+            AppController.checkRefreshToken(StudyInfoActivity.this, new AppController.RefreshTokenListener() {
+              @Override
+              public void onRefreshTokenCompleted(String result) {
+                Log.e("check", "response is 2 " + result);
+                if (result.equalsIgnoreCase("sucess")) {
+                  header.put(
+                      "Authorization",
+                      "Bearer "
+                          + AppController.getHelperSharedPreference()
+                          .readPreference(StudyInfoActivity.this, getResources().getString(R.string.auth), ""));
+                  getStudyStateApiCall(header);
+                } else {
+                  AppController.getHelperProgressDialog().dismissDialog();
+                  Toast.makeText(StudyInfoActivity.this, "session expired", Toast.LENGTH_LONG).show();
+                  AppController.getHelperSessionExpired(StudyInfoActivity.this, "");
+                }
+              }
+            },UrlTypeConstants.EnrollmentDataStore);
+          }
+        });
+  }
+
+  private void setStudyState(StudyData dataResponse) {
+    this.runOnUiThread(new Runnable() {
+      @Override
+      public void run() {
+        AppController.getHelperProgressDialog().dismissDialog();
+        studies = dataResponse;
+        String studyStatusCheck = "";
+        if (studies != null) {
+          studies.setUserId(
+                  AppController.getHelperSharedPreference()
+                          .readPreference(StudyInfoActivity.this, getString(R.string.userid), ""));
+          dbServiceSubscriber.saveStudyPreferencesToDB(StudyInfoActivity.this, studies);
+
+          userPreferenceStudies = studies.getStudies();
+          StudyList studyList = dbServiceSubscriber.getStudiesDetails(studyId, realm);
+          for (int i = 0; i < userPreferenceStudies.size(); i++) {
+            if (userPreferenceStudies.get(i).getStudyId().equalsIgnoreCase(studyId)) {
+              studyStatusCheck = userPreferenceStudies.get(i).getStatus();
+            }
+          }
+          if (studyStatusCheck.equalsIgnoreCase("enrolled")) {
+            new CallConsentMetaData(false).execute();
+          } else if (!studyList.getSetting().isEnrolling()) {
+            Toast.makeText(getApplication(), R.string.study_no_enroll, Toast.LENGTH_SHORT).show();
+          } else if (studyList.getStatus().equalsIgnoreCase(StudyFragment.PAUSED)) {
+            Toast.makeText(getApplication(), R.string.study_paused, Toast.LENGTH_SHORT).show();
+          } else {
+            new CallConsentMetaData(false).execute();
+          }
+        } else {
+          Toast.makeText(StudyInfoActivity.this, R.string.unable_to_parse, Toast.LENGTH_SHORT).show();
+        }
+      }});
+  }
+
+  @Override
+  public <T> void asyncResponse(T response, int responseCode) {
+    /*if (responseCode == STUDY_INFO) {
+      studyHome = (StudyHome) response;
+      if (studyHome != null) {
+        HashMap<String, String> header = new HashMap<>();
+        String url =
+            Urls.GET_CONSENT_DOC
+                + "?studyId="
+                + studyId
+                + "&consentVersion=&activityId=&activityVersion=";
+        GetUserStudyInfoEvent getUserStudyInfoEvent = new GetUserStudyInfoEvent();
+        StudyDatastoreConfigEvent studyDatastoreConfigEvent =
+            new StudyDatastoreConfigEvent(
+                "get",
+                url,
+                StudyInfoActivity.GET_CONSENT_DOC,
+                StudyInfoActivity.this,
+                ConsentDocumentData.class,
+                null,
+                header,
+                null,
+                false,
+                StudyInfoActivity.this);
+
+        getUserStudyInfoEvent.setStudyDatastoreConfigEvent(studyDatastoreConfigEvent);
+        StudyModulePresenter studyModulePresenter = new StudyModulePresenter();
+        studyModulePresenter.performGetGateWayStudyInfo(getUserStudyInfoEvent);
+      } else {
+        AppController.getHelperProgressDialog().dismissDialog();
+        Toast.makeText(this, R.string.unable_to_parse, Toast.LENGTH_SHORT).show();
+      }
+    }
+    else*/ if (responseCode == UPDATE_PREFERENCES) {
+      LoginData loginData = (LoginData) response;
+      AppController.getHelperProgressDialog().dismissDialog();
+      if (loginData != null) {
+
+        dbServiceSubscriber.updateStudyPreferenceToDb(this, studyId, studyStatus);
+        /// delete offline row
+        dbServiceSubscriber.deleteOfflineDataRow(this, deleteIndexNumberDb);
+      }
+    } else if (responseCode == GET_CONSENT_DOC) {
+      AppController.getHelperProgressDialog().dismissDialog();
+      consentDocumentData = (ConsentDocumentData) response;
+      getStudyWebsiteNull();
+      studyHome.setStudyId(studyId);
+      if (studyHome != null) {
+        dbServiceSubscriber.saveStudyInfoToDB(this, studyHome);
+      }
+      if (consentDocumentData != null) {
+        consentDocumentData.setStudyId(studyId);
+        dbServiceSubscriber.saveConsentDocumentToDB(this, consentDocumentData);
+      }
+      setViewPagerView(studyHome);
+    } else if (responseCode == GET_PREFERENCES) {
+
+      AppController.getHelperProgressDialog().dismissDialog();
+      StudyData studies = (StudyData) response;
+      String studyStatusCheck = "";
+      if (studies != null) {
+        studies.setUserId(
+            AppController.getHelperSharedPreference()
+                .readPreference(StudyInfoActivity.this, getString(R.string.userid), ""));
+        dbServiceSubscriber.saveStudyPreferencesToDB(this, studies);
+
+        userPreferenceStudies = studies.getStudies();
+        StudyList studyList = dbServiceSubscriber.getStudiesDetails(studyId, realm);
+        for (int i = 0; i < userPreferenceStudies.size(); i++) {
+          if (userPreferenceStudies.get(i).getStudyId().equalsIgnoreCase(studyId)) {
+            studyStatusCheck = userPreferenceStudies.get(i).getStatus();
+          }
+        }
+        if (studyStatusCheck.equalsIgnoreCase("enrolled")) {
+          new CallConsentMetaData(false).execute();
+        } else if (!studyList.getSetting().isEnrolling()) {
+          Toast.makeText(getApplication(), R.string.study_no_enroll, Toast.LENGTH_SHORT).show();
+        } else if (studyList.getStatus().equalsIgnoreCase(StudyFragment.PAUSED)) {
+          Toast.makeText(getApplication(), R.string.study_paused, Toast.LENGTH_SHORT).show();
+        } else {
+          new CallConsentMetaData(false).execute();
+        }
+      } else {
+        Toast.makeText(StudyInfoActivity.this, R.string.unable_to_parse, Toast.LENGTH_SHORT).show();
+      }
+    }
+  }
+
+  private void getStudyWebsiteNull() {
+    joinButton.setVisibility(View.VISIBLE);
+    if ((aboutThisStudy) && studyHome.getStudyWebsite().equalsIgnoreCase("")) {
+      bottomBar.setVisibility(View.INVISIBLE);
+      bottomBar1.setVisibility(View.GONE);
+      joinButton.setVisibility(View.INVISIBLE);
+      visitWebsiteButton.setClickable(false);
+      learnMoreButton.setClickable(false);
+    } else if (aboutThisStudy) {
+      bottomBar.setVisibility(View.INVISIBLE);
+      bottomBar1.setVisibility(View.VISIBLE);
+      joinButton.setVisibility(View.INVISIBLE);
+      visitWebsiteButton.setClickable(false);
+      learnMoreButton.setClickable(false);
+      if (studyHome.getStudyWebsite() != null
+          && !studyHome.getStudyWebsite().equalsIgnoreCase("")) {
+        consentLayButton.setText(getResources().getString(R.string.visit_website));
+        consentLay.setOnClickListener(
+            new View.OnClickListener() {
+              @Override
+              public void onClick(View v) {
+                Bundle eventProperties = new Bundle();
+                eventProperties.putString(
+                    CustomFirebaseAnalytics.Param.BUTTON_CLICK_REASON,
+                    getString(R.string.view_consent));
+                analyticsInstance.logEvent(
+                    CustomFirebaseAnalytics.Event.ADD_BUTTON_CLICK, eventProperties);
+                Intent browserIntent =
+                    new Intent(Intent.ACTION_VIEW, Uri.parse(studyHome.getStudyWebsite()));
+                startActivity(browserIntent);
+              }
+            });
+      } else {
+        consentLay.setVisibility(View.GONE);
+      }
+    } else if (studyHome.getStudyWebsite().equalsIgnoreCase("")) {
+      bottomBar.setVisibility(View.INVISIBLE);
+      bottomBar1.setVisibility(View.VISIBLE);
+      visitWebsiteButton.setClickable(false);
+      learnMoreButton.setClickable(false);
+      consentLay.setOnClickListener(
+          new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+              Bundle eventProperties = new Bundle();
+              eventProperties.putString(
+                  CustomFirebaseAnalytics.Param.BUTTON_CLICK_REASON,
+                  getString(R.string.view_consent));
+              analyticsInstance.logEvent(
+                  CustomFirebaseAnalytics.Event.ADD_BUTTON_CLICK, eventProperties);
+              try {
+                Intent intent = new Intent(StudyInfoActivity.this, WebViewActivity.class);
+                intent.putExtra("consent", consentDocumentData.getConsent().getContent());
+                startActivity(intent);
+              } catch (Exception e) {
+                Logger.log(e);
+              }
+            }
+          });
+    } else {
+      bottomBar.setVisibility(View.VISIBLE);
+      bottomBar1.setVisibility(View.GONE);
+      visitWebsiteButton.setClickable(true);
+      learnMoreButton.setClickable(true);
+    }
+
+    if (status.equalsIgnoreCase(getString(R.string.closed))) {
+      joinButton.setVisibility(View.GONE);
+    }
+  }
+
+  @Override
+  public void asyncResponseFailure(int responseCode, String errormsg, String statusCode) {
+    AppController.getHelperProgressDialog().dismissDialog();
+    if (statusCode.equalsIgnoreCase("401")) {
+      AppController.getHelperSessionExpired(this, errormsg);
+    } else {
+      // offline update
+      if (responseCode == UPDATE_PREFERENCES) {
+        dbServiceSubscriber.updateStudyPreferenceToDb(this, studyId, studyStatus);
+      }
+      studyHome = dbServiceSubscriber.getStudyInfoListFromDB(studyId, realm);
+      if (studyHome != null) {
+        consentDocumentData = dbServiceSubscriber.getConsentDocumentFromDB(studyId, realm);
+        getStudyWebsiteNull();
+        setViewPagerView(studyHome);
+      } else {
+        Toast.makeText(StudyInfoActivity.this, errormsg, Toast.LENGTH_SHORT).show();
+        finish();
+      }
+    }
+  }
+
+  private void callGetStudyInfoWebservice() {
+    AppController.getHelperProgressDialog().showProgress(StudyInfoActivity.this, "", "", false);
+   /* HashMap<String, String> header = new HashMap<>();
+    String url = Urls.STUDY_INFO + "?studyId=" + studyId;
+    GetUserStudyInfoEvent getUserStudyInfoEvent = new GetUserStudyInfoEvent();
+    StudyDatastoreConfigEvent studyDatastoreConfigEvent =
+        new StudyDatastoreConfigEvent(
+            "get",
+            url,
+            STUDY_INFO,
+            StudyInfoActivity.this,
+            StudyHome.class,
+            null,
+            header,
+            null,
+            false,
+            StudyInfoActivity.this);
+
+    getUserStudyInfoEvent.setStudyDatastoreConfigEvent(studyDatastoreConfigEvent);
+    StudyModulePresenter studyModulePresenter = new StudyModulePresenter();
+    studyModulePresenter.performGetGateWayStudyInfo(getUserStudyInfoEvent);*/
+     apiInterface = new ServiceManager().createService(StudyDataStoreAPIInterface.class, UrlTypeConstants.StudyDataStore);
+    mSBNetworkSubscriptionl = NetworkRequest.performAsyncRequest(apiInterface.getStudyInfo(studyId), (data) -> {
+      try{
+      setStudyInfo(data);
+      }catch (Exception e){
+        Log.e("TAG", "error: " + e.getMessage());
+      }
+    }, (error) -> {
+      runOnUiThread(new Runnable() {
+        @Override
+        public void run() {
+          AppController.getHelperProgressDialog().dismissDialog();
+          studyHome = dbServiceSubscriber.getStudyInfoListFromDB(studyId, realm);
+          if (studyHome != null) {
+            consentDocumentData = dbServiceSubscriber.getConsentDocumentFromDB(studyId, realm);
+            getStudyWebsiteNull();
+            setViewPagerView(studyHome);
+          } else {
+            Toast.makeText(StudyInfoActivity.this, AppController.getErrorMessage(error), Toast.LENGTH_SHORT).show();
+            finish();
+          }
+        }
+      });
+    });
+  }
+
+  private void setStudyInfo(StudyHome response) {
+    studyHome = response;
+    AppController.getHelperProgressDialog().dismissDialog();
+    if (studyHome != null) {
+      HashMap<String, String> header = new HashMap<>();
+     /* String url =
+              Urls.GET_CONSENT_DOC
+                      + "?studyId="
+                      + studyId
+                      + "&consentVersion=&activityId=&activityVersion=";
+      GetUserStudyInfoEvent getUserStudyInfoEvent = new GetUserStudyInfoEvent();
+      StudyDatastoreConfigEvent studyDatastoreConfigEvent =
+              new StudyDatastoreConfigEvent(
+                      "get",
+                      url,
+                      StudyInfoActivity.GET_CONSENT_DOC,
+                      StudyInfoActivity.this,
+                      ConsentDocumentData.class,
+                      null,
+                      header,
+                      null,
+                      false,
+                      StudyInfoActivity.this);
+
+      getUserStudyInfoEvent.setStudyDatastoreConfigEvent(studyDatastoreConfigEvent);
+      StudyModulePresenter studyModulePresenter = new StudyModulePresenter();
+      studyModulePresenter.performGetGateWayStudyInfo(getUserStudyInfoEvent);*/
+      apiInterface = new ServiceManager().createService(StudyDataStoreAPIInterface.class, UrlTypeConstants.StudyDataStore);
+      mSBNetworkSubscriptionl = NetworkRequest.performAsyncRequest(apiInterface
+                      .getConsentDocument(studyId, "", "", ""),
+              (data) -> {
+                setConsentDocument(data);
+              }, (error) -> {
+                this.runOnUiThread(new Runnable() {
+                  @Override
+                  public void run() {
+                    AppController.getHelperProgressDialog().dismissDialog();
+
+                  }
+                });
+              });
+    } else {
+      AppController.getHelperProgressDialog().dismissDialog();
+      Toast.makeText(this, R.string.unable_to_parse, Toast.LENGTH_SHORT).show();
+    }
+  }
+
+  private void setConsentDocument(ConsentDocumentData consentDocumentDataResponse) {
+    this.runOnUiThread(new Runnable() {
+      @Override
+      public void run() {
+        AppController.getHelperProgressDialog().dismissDialog();
+        consentDocumentData = consentDocumentDataResponse;
+        getStudyWebsiteNull();
+        studyHome.setStudyId(studyId);
+        if (studyHome != null) {
+          dbServiceSubscriber.saveStudyInfoToDB(StudyInfoActivity.this, studyHome);
+        }
+        if (consentDocumentData != null) {
+          consentDocumentData.setStudyId(studyId);
+          dbServiceSubscriber.saveConsentDocumentToDB(StudyInfoActivity.this, consentDocumentData);
+        }
+        setViewPagerView(studyHome);
+      }});
+  }
+
+  public void updatebookmark(boolean b) {
+    AppController.getHelperProgressDialog().showProgress(this, "", "", false);
+
+    HashMap<String, String> header = new HashMap();
+    header.put(
+        "Authorization",
+        "Bearer "
+            + AppController.getHelperSharedPreference()
+            .readPreference(this, getResources().getString(R.string.auth), ""));
+    header.put(
+        "userId",
+        AppController.getHelperSharedPreference()
+            .readPreference(this, getResources().getString(R.string.userid), ""));
+
+    HashMap<String,Object> jsonObject = new HashMap<>();
+
+    ArrayList studieslist = new ArrayList();
+    HashMap<String,Object> studies = new HashMap<>();
+    studies.put("studyId", studyId);
+    studieslist.add(studies);
+    jsonObject.put("studies", studieslist);
+
+    /////////// offline data storing
+    try {
+      int number = dbServiceSubscriber.getUniqueID(realm);
+      if (number == 0) {
+        number = 1;
+      } else {
+        number += 1;
+      }
+      OfflineData offlineData = dbServiceSubscriber.getStudyIdOfflineData(studyId, realm);
+      if (offlineData != null) {
+        number = offlineData.getNumber();
+      }
+      deleteIndexNumberDb = number;
+      JSONObject json= new JSONObject(jsonObject);
+
+      AppController.pendingService(
+          this,
+          number,
+          "post_object",
+          "updateStudyState",
+          "",
+          json.toString(),
+          "ParticipantEnrollmentDatastore",
+          "",
+          studyId,
+          "");
+    } catch (Exception e) {
+      Logger.log(e);
+    }
+    //////////
+    /*ParticipantEnrollmentDatastoreConfigEvent participantEnrollmentDatastoreConfigEvent =
+        new ParticipantEnrollmentDatastoreConfigEvent(
+            "post_object",
+            Urls.UPDATE_STUDY_PREFERENCE,
+            UPDATE_PREFERENCES,
+            this,
+            LoginData.class,
+            null,
+            header,
+            jsonObject,
+            false,
+            this);
+    UpdatePreferenceEvent updatePreferenceEvent = new UpdatePreferenceEvent();
+    updatePreferenceEvent.setParticipantEnrollmentDatastoreConfigEvent(
+        participantEnrollmentDatastoreConfigEvent);
+    UserModulePresenter userModulePresenter = new UserModulePresenter();
+    userModulePresenter.performUpdateUserPreference(updatePreferenceEvent);*/
+    updatestudyApiCall(header,jsonObject);
+  }
+
+  private void updatestudyApiCall(HashMap<String, String> header, HashMap<String, Object> jsonObject) {
+    enrollmentDataStoreInterface = new ServiceManager().createService(EnrollmentDataStoreInterface.class, UrlTypeConstants.EnrollmentDataStore);
+    NetworkRequest.performAsyncRequest(enrollmentDataStoreInterface
+            .updateStudyState(header, jsonObject),
+        (data) -> {
+          try {
+            updateStudyState(data);
+          } catch (Exception e) {
+            Log.e("TAG", e.getMessage());
+          }
+        }, (error) -> {
+          this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+              code = AppController.getErrorCode(error);
+              errormsg = AppController.getErrorMessage(error);
+              if (code == 401 && errormsg.equalsIgnoreCase("Unauthorized or Invalid token")) {
+                AppController.checkRefreshToken(StudyInfoActivity.this, new AppController.RefreshTokenListener() {
+                  @Override
+                  public void onRefreshTokenCompleted(String result) {
+                    Log.e("check", "response is 2 " + result);
+                    if (result.equalsIgnoreCase("sucess")) {
+                      header.put(
+                          "Authorization",
+                          "Bearer "
+                              + AppController.getHelperSharedPreference()
+                              .readPreference(StudyInfoActivity.this, getResources().getString(R.string.auth), ""));
+                      getStudyStateApiCall(header);
+                    } else {
+                      AppController.getHelperProgressDialog().dismissDialog();
+                      Toast.makeText(StudyInfoActivity.this, "session expired", Toast.LENGTH_LONG).show();
+                      AppController.getHelperSessionExpired(StudyInfoActivity.this, "");
+                    }
+                  }
+                }, UrlTypeConstants.EnrollmentDataStore);
+              } else {
+                AppController.getHelperProgressDialog().dismissDialog();
+                // offline update
+                  dbServiceSubscriber.updateStudyPreferenceToDb(StudyInfoActivity.this, studyId, studyStatus);
+                studyHome = dbServiceSubscriber.getStudyInfoListFromDB(studyId, realm);
+                if (studyHome != null) {
+                  consentDocumentData = dbServiceSubscriber.getConsentDocumentFromDB(studyId, realm);
+                  getStudyWebsiteNull();
+                  setViewPagerView(studyHome);
+                } else {
+                  Toast.makeText(StudyInfoActivity.this, errormsg, Toast.LENGTH_SHORT).show();
+                  finish();
+                }
+              }
+
+
+            }
+          });
+        });
+
+  }
+
+  private void updateStudyState(LoginData dataResponse) {
+    this.runOnUiThread(new Runnable() {
+      @Override
+      public void run() {
+        LoginData loginData = dataResponse;
+        AppController.getHelperProgressDialog().dismissDialog();
+        if (loginData != null) {
+
+          dbServiceSubscriber.updateStudyPreferenceToDb(StudyInfoActivity.this, studyId, studyStatus);
+          /// delete offline row
+          dbServiceSubscriber.deleteOfflineDataRow(StudyInfoActivity.this, deleteIndexNumberDb);
+        }
+      }});
+  }
+
+  private void startConsent(Consent consent, String type) {
+    eligibilityType = type;
+    AppController.getHelperSharedPreference()
+        .writePreference(this, "DataSharingScreen" + title, "false");
+    Toast.makeText(
+            this,
+            getResources().getString(R.string.please_review_the_updated_consent),
+            Toast.LENGTH_SHORT)
+        .show();
+    ConsentBuilder consentBuilder = new ConsentBuilder();
+    List<Step> consentstep = consentBuilder.createsurveyquestion(this, consent, title);
+    Task consentTask = new OrderedTask(StudyFragment.CONSENT, consentstep);
+    Intent intent =
+        CustomConsentViewTaskActivity.newIntent(
+            this, consentTask, studyId, "", title, eligibilityType, "update");
+    startActivityForResult(intent, CONSENT_RESPONSECODE);
+  }
+
+  private void setViewPagerView(final StudyHome studyHome) {
+
+    ViewPager viewpager = (ViewPager) findViewById(R.id.viewpager);
+    CircleIndicator indicator = (CircleIndicator) findViewById(R.id.indicator);
+    viewpager.setAdapter(
+        new StudyInfoPagerAdapter(StudyInfoActivity.this, studyHome.getInfo(), studyId));
+    indicator.setViewPager(viewpager);
+    if (studyHome.getInfo().size() < 2) {
+      indicator.setVisibility(View.GONE);
+    }
+    viewpager.setCurrentItem(0);
+    indicator.setOnPageChangeListener(
+        new ViewPager.OnPageChangeListener() {
+          public void onPageScrollStateChanged(int state) {}
+
+          public void onPageScrolled(
+              int position, float positionOffset, int positionOffsetPixels) {}
+
+          public void onPageSelected(int position) {
+            // Check if this is the page you want.
+            if (studyHome.getInfo().get(position).getType().equalsIgnoreCase("video")) {
+              joinButton.setBackground(getResources().getDrawable(R.drawable.rectangle_blue_white));
+              joinButton.setTextColor(getResources().getColor(R.color.white));
+            } else {
+              joinButton.setBackground(
+                  getResources().getDrawable(R.drawable.rectangle_black_white));
+              joinButton.setTextColor(getResources().getColor(R.color.colorPrimary));
+            }
+          }
+        });
+
+    if (getIntent().getStringExtra("flow") != null
+        && getIntent().getStringExtra("flow").equalsIgnoreCase("login_callback")) {
+      loginCallback();
+    }
+  }
+
+  @Override
+  protected void onResume() {
+    super.onResume();
+    IntentFilter intentFilter = new IntentFilter(ConnectivityManager.CONNECTIVITY_ACTION);
+    registerReceiver(networkChangeReceiver, intentFilter);
+  }
+
+  @Override
+  protected void onPause() {
+    super.onPause();
+    if (networkChangeReceiver != null) {
+      unregisterReceiver(networkChangeReceiver);
+    }
+  }
+
+  @Override
+  protected void onDestroy() {
+    dbServiceSubscriber.closeRealmObj(realm);
+    super.onDestroy();
+  }
+}

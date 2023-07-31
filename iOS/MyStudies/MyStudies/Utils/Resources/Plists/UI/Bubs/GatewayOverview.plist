@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>title</key>
+		<string>Welcome to BubsCare</string>
+		<key>text</key>
+		<string>Creating new generations of happy, joyful bubs.</string>
+		<key>type</key>
+		<string>video</string>
+		<key>image</key>
+		<string>welcomeBgBubs</string>
+		<key>videoLink</key>
+		<string></string>
+		<key>iconImage</key>
+		<string>overviewLogoBubs</string>
+	</dict>
+</array>
+</plist>

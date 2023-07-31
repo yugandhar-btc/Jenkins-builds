@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+	<dict>
+		<key>title</key>
+		<string>Welcome to Validcare! </string>
+		<key>text</key>
+		<string>With your help, Validcare helps pharmaceutical, medical device and supplement manufacturers better understand the safety effectiveness of their products for you and people like you.  Thank you for participating!</string>
+		<key>type</key>
+		<string>video</string>
+		<key>image</key>
+		<string>welcomeBg</string>
+		<key>videoLink</key>
+		<string></string>
+	</dict>
+	<dict>
+		<key>title</key>
+		<string>Your Participation Helps You and People Like You</string>
+		<key>text</key>
+		<string>Thanks for your interest in joining us in research of the safety and effectiveness of new drugs, supplements, and medical devices.  Your contributions help determine optimal and safe use.</string>
+		<key>type</key>
+		<string></string>
+		<key>image</key>
+		<string>img_01</string>
+		<key>videoLink</key>
+		<string></string>
+	</dict>
+</array>
+</plist>

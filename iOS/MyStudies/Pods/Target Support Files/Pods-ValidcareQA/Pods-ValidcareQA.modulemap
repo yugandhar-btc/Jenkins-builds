@@ -1,0 +1,6 @@
+framework module Pods_ValidcareQA {
+  umbrella header "Pods-ValidcareQA-umbrella.h"
+
+  export *
+  module * { export * }
+}

@@ -1,0 +1,1691 @@
+/*
+ * Copyright © 2017-2019 Harvard Pilgrim Health Care Institute (HPHCI) and its Contributors.
+ * Copyright 2020 Google LLC
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+ * associated documentation files (the "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial
+ * portions of the Software.
+ *
+ * Funding Source: Food and Drug Administration (“Funding Agency”) effective 18 September 2014 as Contract no. HHSF22320140030I/HHSF22301006T (the “Prime Contract”).
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+package com.harvard.studyappmodule;
+
+import android.app.Activity;
+import android.content.ComponentName;
+import android.content.Context;
+import android.content.Intent;
+import android.os.Bundle;
+import android.util.Log;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.RelativeLayout;
+import android.widget.Toast;
+import androidx.appcompat.widget.AppCompatImageView;
+import androidx.appcompat.widget.AppCompatTextView;
+import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import com.harvard.AppConfig;
+import com.harvard.R;
+import com.harvard.ServiceManager;
+import com.harvard.notificationmodule.NotificationModuleSubscriber;
+import com.harvard.storagemodule.DbServiceSubscriber;
+import com.harvard.studyappmodule.activitylistmodel.AnchorDateSchedulingDetails;
+import com.harvard.studyappmodule.custom.result.StepRecordCustom;
+import com.harvard.studyappmodule.events.DeleteAccountEvent;
+import com.harvard.studyappmodule.studymodel.DeleteAccountData;
+import com.harvard.studyappmodule.studymodel.NotificationDbResources;
+import com.harvard.studyappmodule.studymodel.Resource;
+import com.harvard.studyappmodule.studymodel.StudyHome;
+import com.harvard.studyappmodule.studymodel.StudyResource;
+import com.harvard.usermodule.UserModulePresenter;
+import com.harvard.usermodule.event.UpdatePreferenceEvent;
+import com.harvard.usermodule.webservicemodel.Activities;
+import com.harvard.usermodule.webservicemodel.ActivityData;
+import com.harvard.usermodule.webservicemodel.LoginData;
+import com.harvard.usermodule.webservicemodel.Studies;
+import com.harvard.utils.AppController;
+import com.harvard.utils.CustomFirebaseAnalytics;
+import com.harvard.utils.Logger;
+import com.harvard.utils.SharedPreferenceHelper;
+import com.harvard.utils.Urls;
+import com.harvard.webservicemodule.apihelper.ApiCall;
+import com.harvard.webservicemodule.apihelper.ConnectionDetector;
+import com.harvard.webservicemodule.apihelper.EnrollmentDataStoreInterface;
+import com.harvard.webservicemodule.apihelper.HttpRequest;
+import com.harvard.webservicemodule.apihelper.NetworkRequest;
+import com.harvard.webservicemodule.apihelper.ParticipantDataStoreAPIInterface;
+import com.harvard.webservicemodule.apihelper.ResponseServerInterface;
+import com.harvard.webservicemodule.apihelper.Responsemodel;
+import com.harvard.webservicemodule.apihelper.StudyDataStoreAPIInterface;
+import com.harvard.webservicemodule.apihelper.UrlTypeConstants;
+import com.harvard.webservicemodule.events.ParticipantDatastoreConfigEvent;
+import com.harvard.webservicemodule.events.ParticipantEnrollmentDatastoreConfigEvent;
+
+import io.realm.Realm;
+import io.realm.RealmList;
+import io.realm.RealmResults;
+import okhttp3.ResponseBody;
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import rx.Subscription;
+
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.net.HttpURLConnection;
+import java.text.ParseException;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+public class SurveyResourcesFragment<T> extends Fragment implements ApiCall.OnAsyncRequestComplete {
+
+  private static final int STUDY_INFO = 10;
+  private static final int UPDATE_USERPREFERENCE_RESPONSECODE = 100;
+  private static final int DELETE_ACCOUNT_REPSONSECODE = 101;
+  private static final int RESOURCE_REQUEST_CODE = 213;
+  private static final int WITHDRAWFROMSTUDY = 105;
+  private RecyclerView studyRecyclerView;
+  private Context context;
+  private AppCompatTextView title;
+  private RealmList<Resource> resourceArrayList;
+  private String studyId;
+  private StudyHome studyHome;
+  private StudyResource studyResource;
+  private DbServiceSubscriber dbServiceSubscriber;
+  private static String RESOURCES = "resources";
+  private Realm realm;
+  private ArrayList<AnchorDateSchedulingDetails> arrayList;
+  private CustomFirebaseAnalytics analyticsInstance;
+  private StudyDataStoreAPIInterface apiInterface;
+  private Subscription mSBNetworkSubscriptionl;
+  private ParticipantDataStoreAPIInterface anInterface;
+  private EnrollmentDataStoreInterface enrollmentDataStoreInterface;
+  private int code;
+  private String errormsg;
+  private ResponseServerInterface responseServerInterface;
+
+
+  @Override
+  public void onAttach(Context context) {
+    super.onAttach(context);
+    this.context = context;
+
+    if(this.context == null) {
+      this.context = getContext();
+    }
+  }
+
+  @Override
+  public View onCreateView(
+      LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    // Inflate the layout for this fragment
+    View view = inflater.inflate(R.layout.fragment_survey_resources, container, false);
+    analyticsInstance = CustomFirebaseAnalytics.getInstance(context);
+    dbServiceSubscriber = new DbServiceSubscriber();
+    realm = AppController.getRealmobj(context);
+    anInterface = new ServiceManager()
+        .createService(ParticipantDataStoreAPIInterface.class,UrlTypeConstants.ParticipantDataStore);
+    initializeXmlId(view);
+    setTextForView();
+    setFont();
+    getResourceListWebservice();
+
+    return view;
+  }
+
+  private void getResourceListWebservice() {
+    AppController.getHelperProgressDialog().showProgress(context, "", "", false);
+//    HashMap<String, String> header = new HashMap<>();
+    studyId = ((SurveyActivity) context).getStudyId();
+//    header.put("studyId", studyId);
+//    String url = Urls.RESOURCE_LIST + "?studyId=" + studyId;
+//    GetResourceListEvent getResourceListEvent = new GetResourceListEvent();
+//    StudyDatastoreConfigEvent studyDatastoreConfigEvent =
+//        new StudyDatastoreConfigEvent(
+//            "get",
+//            url,
+//            RESOURCE_REQUEST_CODE,
+//            context,
+//            StudyResource.class,
+//            null,
+//            header,
+//            null,
+//            false,
+//            this);
+//
+//    getResourceListEvent.setStudyDatastoreConfigEvent(studyDatastoreConfigEvent);
+//    StudyModulePresenter studyModulePresenter = new StudyModulePresenter();
+//    studyModulePresenter.performGetResourceListEvent(getResourceListEvent);
+    apiInterface = new ServiceManager().createService(StudyDataStoreAPIInterface.class, UrlTypeConstants.StudyDataStore);
+    mSBNetworkSubscriptionl = NetworkRequest.performAsyncRequest(apiInterface
+            .getResources(studyId,studyId),
+        (data) -> {
+          setResources(data);
+        }, (error) -> {
+      Log.e("check","error is "+error);
+      AppController.getHelperProgressDialog().dismissDialog();
+      errormsg = AppController.getErrorMessage(error);
+          if (error.getMessage().equalsIgnoreCase("401")) {
+            Toast.makeText(context, errormsg, Toast.LENGTH_SHORT).show();
+            AppController.getHelperSessionExpired(context, error.getMessage());
+          } else {
+            try {
+              if (dbServiceSubscriber.getStudyResource(studyId, realm) == null) {
+                Toast.makeText(context, errormsg, Toast.LENGTH_LONG).show();
+              } else if (dbServiceSubscriber.getStudyResource(studyId, realm).getResources() == null) {
+                Toast.makeText(context, errormsg, Toast.LENGTH_LONG).show();
+              } else {
+                resourceArrayList = dbServiceSubscriber.getStudyResource(studyId, realm).getResources();
+                if (resourceArrayList == null || resourceArrayList.size() == 0) {
+                  Toast.makeText(context, errormsg, Toast.LENGTH_LONG).show();
+                } else {
+                  calculatedResources(resourceArrayList);
+                }
+              }
+            } catch (Exception e) {
+              Logger.log(e);
+            }
+          }
+        });
+  }
+
+  private void setResources(StudyResource data) {
+    if (data != null) {
+      studyResource = data;
+
+      callGetStudyInfoWebservice();
+    }
+  }
+
+  private void callGetStudyInfoWebservice() {
+    AppController.getHelperProgressDialog().showProgress(context, "", "", false);
+    /*HashMap<String, String> header = new HashMap<>();
+    String url = Urls.STUDY_INFO + "?studyId=" + studyId;
+    GetUserStudyInfoEvent getUserStudyInfoEvent = new GetUserStudyInfoEvent();
+    StudyDatastoreConfigEvent studyDatastoreConfigEvent =
+        new StudyDatastoreConfigEvent(
+            "get", url, STUDY_INFO, context, StudyHome.class, null, header, null, false, this);
+
+    getUserStudyInfoEvent.setStudyDatastoreConfigEvent(studyDatastoreConfigEvent);
+    StudyModulePresenter studyModulePresenter = new StudyModulePresenter();
+    studyModulePresenter.performGetGateWayStudyInfo(getUserStudyInfoEvent);*/
+    StudyInfoApiCall(studyId);
+  }
+
+  private void StudyInfoApiCall(String studyId) {
+    apiInterface =new ServiceManager().createService(StudyDataStoreAPIInterface.class, UrlTypeConstants.StudyDataStore);
+    mSBNetworkSubscriptionl = NetworkRequest.performAsyncRequest(apiInterface.getStudyInfo(studyId), (data) -> {
+      try{
+        setStudyInfo(data);
+      }catch (Exception e) {
+        Log.e("TAG", "error: " + e.getMessage());
+      }
+    }, (error) -> {
+      code = AppController.getErrorCode(error);
+      errormsg = AppController.getErrorMessage(error);
+      AppController.getHelperProgressDialog().dismissDialog();
+
+      if (code == 401 && errormsg.equalsIgnoreCase("Unauthorized or Invalid token")) {
+        AppController.checkRefreshToken(context, new AppController.RefreshTokenListener() {
+          @Override
+          public void onRefreshTokenCompleted(String result) {
+            Log.e("check", "response is 2 " + result);
+            if (result.equalsIgnoreCase("sucess")) {
+
+            } else {
+              AppController.getHelperProgressDialog().dismissDialog();
+              Toast.makeText(context, "session expired", Toast.LENGTH_LONG).show();
+              AppController.getHelperSessionExpired(context, "");
+            }
+          }
+        },UrlTypeConstants.StudyDataStore);
+      } else {
+        AppController.getHelperProgressDialog().dismissDialog();
+        Toast.makeText(context, errormsg, Toast.LENGTH_SHORT).show();
+      }
+    });
+  }
+
+  private void setStudyInfo(StudyHome data) {
+    AppController.getHelperProgressDialog().dismissDialog();
+
+    if (data != null) {
+      ((SurveyActivity) context).runOnUiThread(new Runnable() {
+        @Override
+        public void run() {
+          studyHome = data;
+          studyHome.setStudyId(studyId);
+          dbServiceSubscriber.saveStudyInfoToDB(context, studyHome);
+
+          if (studyResource != null) {
+            resourceArrayList = studyResource.getResources();
+            if (resourceArrayList == null) {
+              resourceArrayList = new RealmList<>();
+            }
+            addStaticVal();
+
+            // primary key studyId
+            studyResource.setStudyId(studyId);
+            // remove duplicate and
+            dbServiceSubscriber.deleteStudyResourceDuplicateRow(context, studyId);
+            dbServiceSubscriber.saveResourceList(context, studyResource);
+
+            calculatedResources(resourceArrayList);
+          }
+
+        }
+      });
+    }
+  }
+
+
+  private void initializeXmlId(View view) {
+    title = (AppCompatTextView) view.findViewById(R.id.title);
+    studyRecyclerView = (RecyclerView) view.findViewById(R.id.studyRecyclerView);
+    RelativeLayout backBtn = (RelativeLayout) view.findViewById(R.id.backBtn);
+    backBtn.setOnClickListener(
+        new View.OnClickListener() {
+          @Override
+          public void onClick(View view) {
+            if (AppConfig.AppType.equalsIgnoreCase(getContext().getString(R.string.app_gateway))) {
+              Bundle eventProperties = new Bundle();
+              eventProperties.putString(
+                  CustomFirebaseAnalytics.Param.BUTTON_CLICK_REASON,
+                  getContext().getString(R.string.survey_resource_home));
+              analyticsInstance.logEvent(
+                  CustomFirebaseAnalytics.Event.ADD_BUTTON_CLICK, eventProperties);
+              Intent intent = new Intent(context, StudyActivity.class);
+              ComponentName cn = intent.getComponent();
+              Intent mainIntent = Intent.makeRestartActivityTask(cn);
+              context.startActivity(mainIntent);
+              ((Activity) context).finish();
+            } else {
+              ((SurveyActivity) context).openDrawer();
+            }
+          }
+        });
+
+    AppCompatImageView backBtnimg = view.findViewById(R.id.backBtnimg);
+    AppCompatImageView menubtnimg = view.findViewById(R.id.menubtnimg);
+
+    if (AppConfig.AppType.equalsIgnoreCase(getContext().getString(R.string.app_gateway))) {
+      backBtnimg.setVisibility(View.VISIBLE);
+      menubtnimg.setVisibility(View.GONE);
+    } else {
+      backBtnimg.setVisibility(View.GONE);
+      menubtnimg.setVisibility(View.VISIBLE);
+    }
+  }
+
+  private void setTextForView() {
+    title.setText(getContext().getResources().getString(R.string.resources));
+  }
+
+  private void setFont() {
+    try {
+      title.setTypeface(AppController.getTypeface(context, "bold"));
+    } catch (Exception e) {
+      Logger.log(e);
+    }
+  }
+
+  @Override
+  public <T> void asyncResponse(T response, int responseCode) {
+
+    // RESOURCE_REQUEST_CODE: while coming screen, every time after resourcelist service calling
+    // study info
+    // stop and again start progress bar, to avoid that using this
+    if (responseCode != RESOURCE_REQUEST_CODE) {
+      AppController.getHelperProgressDialog().dismissDialog();
+    }
+    if (responseCode == RESOURCE_REQUEST_CODE) {
+      // call study info
+
+      if (response != null) {
+        studyResource = (StudyResource) response;
+
+        callGetStudyInfoWebservice();
+      }
+
+    } else if (responseCode == UPDATE_USERPREFERENCE_RESPONSECODE) {
+
+      dbServiceSubscriber.updateStudyWithddrawnDB(context, studyId, StudyFragment.WITHDRAWN);
+      dbServiceSubscriber.deleteActivityDataRow(context, studyId);
+      dbServiceSubscriber.deleteActivityWsData(context, studyId);
+
+      if (AppConfig.AppType.equalsIgnoreCase(getContext().getString(R.string.app_gateway))) {
+        Intent intent = new Intent(context, StudyActivity.class);
+        ComponentName cn = intent.getComponent();
+        Intent mainIntent = Intent.makeRestartActivityTask(cn);
+        context.startActivity(mainIntent);
+        ((Activity) context).finish();
+      } else {
+        deactivateAccount();
+      }
+    } else if (responseCode == DELETE_ACCOUNT_REPSONSECODE) {
+      LoginData loginData = (LoginData) response;
+      if (loginData != null) {
+        AppController.getHelperSessionExpired(context, "");
+        Toast.makeText(context, R.string.account_deletion, Toast.LENGTH_SHORT).show();
+      } else {
+        Toast.makeText(context, R.string.unable_to_parse, Toast.LENGTH_SHORT).show();
+      }
+    }
+   /* else if (responseCode == STUDY_INFO) {
+      if (response != null) {
+        studyHome = (StudyHome) response;
+        studyHome.setStudyId(studyId);
+        dbServiceSubscriber.saveStudyInfoToDB(context, studyHome);
+
+        if (studyResource != null) {
+          resourceArrayList = studyResource.getResources();
+          if (resourceArrayList == null) {
+            resourceArrayList = new RealmList<>();
+          }
+          addStaticVal();
+
+          // primary key studyId
+          studyResource.setStudyId(studyId);
+          // remove duplicate and
+          dbServiceSubscriber.deleteStudyResourceDuplicateRow(context, studyId);
+          dbServiceSubscriber.saveResourceList(context, studyResource);
+
+          calculatedResources(resourceArrayList);
+        }
+      }
+    }*/
+  }
+
+  private void calculatedResources(RealmList<Resource> resourceArrayList) {
+    // call to resp server to get anchorDate
+    arrayList = new ArrayList<>();
+    resourceArrayList = resourceArrayList;
+    AnchorDateSchedulingDetails anchorDateSchedulingDetails;
+    Studies studies =
+        dbServiceSubscriber.getStudies(((SurveyActivity) context).getStudyId(), realm);
+
+    for (int i = 0; i < resourceArrayList.size(); i++) {
+      if (resourceArrayList.get(i).getAvailability() != null
+          && resourceArrayList.get(i).getAvailability().getAvailabilityType() != null) {
+        if (resourceArrayList
+            .get(i)
+            .getAvailability()
+            .getAvailabilityType()
+            .equalsIgnoreCase("AnchorDate")) {
+
+          if (resourceArrayList
+              .get(i)
+              .getAvailability()
+              .getSourceType()
+              .equalsIgnoreCase("ActivityResponse")) {
+            anchorDateSchedulingDetails = new AnchorDateSchedulingDetails();
+            anchorDateSchedulingDetails.setSourceActivityId(
+                resourceArrayList.get(i).getAvailability().getSourceActivityId());
+            anchorDateSchedulingDetails.setSourceKey(
+                resourceArrayList.get(i).getAvailability().getSourceKey());
+            anchorDateSchedulingDetails.setSourceFormKey(
+                resourceArrayList.get(i).getAvailability().getSourceFormKey());
+
+            anchorDateSchedulingDetails.setSchedulingType(
+                resourceArrayList.get(i).getAvailability().getAvailabilityType());
+            anchorDateSchedulingDetails.setSourceType(
+                resourceArrayList.get(i).getAvailability().getSourceType());
+            anchorDateSchedulingDetails.setStudyId(((SurveyActivity) context).getStudyId());
+            anchorDateSchedulingDetails.setParticipantId(studies.getParticipantId());
+            // targetActivityid is resourceId in this case just to handle with case variable
+            anchorDateSchedulingDetails.setTargetActivityId(
+                resourceArrayList.get(i).getResourcesId());
+
+            Activities activities =
+                dbServiceSubscriber.getActivityPreferenceBySurveyId(
+                    ((SurveyActivity) context).getStudyId(),
+                    anchorDateSchedulingDetails.getSourceActivityId(),
+                    realm);
+            if (activities != null) {
+              anchorDateSchedulingDetails.setActivityState(activities.getStatus());
+              arrayList.add(anchorDateSchedulingDetails);
+            }
+          } else {
+            // For enrollmentDate
+            anchorDateSchedulingDetails = new AnchorDateSchedulingDetails();
+            anchorDateSchedulingDetails.setSchedulingType(
+                resourceArrayList.get(i).getAvailability().getAvailabilityType());
+            anchorDateSchedulingDetails.setSourceType(
+                resourceArrayList.get(i).getAvailability().getSourceType());
+            anchorDateSchedulingDetails.setStudyId(((SurveyActivity) context).getStudyId());
+            anchorDateSchedulingDetails.setParticipantId(studies.getParticipantId());
+            // targetActivityid is resourceId in this case just to handle with case variable
+            anchorDateSchedulingDetails.setTargetActivityId(
+                resourceArrayList.get(i).getResourcesId());
+            anchorDateSchedulingDetails.setAnchorDate(studies.getEnrolledDate());
+            arrayList.add(anchorDateSchedulingDetails);
+          }
+        }
+      }
+    }
+
+    if (!arrayList.isEmpty()) {
+      callLabkeyService(0);
+    } else {
+      metadataProcess();
+    }
+  }
+
+  private void setResourceAdapter() {
+    RealmList<Resource> resources = new RealmList<>();
+    if (resourceArrayList != null) {
+      for (int i = 0; i < resourceArrayList.size(); i++) {
+        if (resourceArrayList.get(i).getAudience() != null
+            && resourceArrayList.get(i).getAudience().equalsIgnoreCase("All")) {
+          if (resourceArrayList.get(i).getAvailability() != null
+              && resourceArrayList.get(i).getAvailability().getAvailableDate() != null
+              && !resourceArrayList
+                  .get(i)
+                  .getAvailability()
+                  .getAvailableDate()
+                  .equalsIgnoreCase("")) {
+            try {
+              Calendar expiryDate = Calendar.getInstance();
+              expiryDate.setTime(
+                  AppController.getDateFormatForResourceAvailability()
+                      .parse(resourceArrayList.get(i).getAvailability().getExpiryDate()));
+              expiryDate.set(Calendar.HOUR, 11);
+              expiryDate.set(Calendar.MINUTE, 59);
+              expiryDate.set(Calendar.SECOND, 59);
+              expiryDate.set(Calendar.AM_PM, Calendar.PM);
+
+              Calendar availableDate = Calendar.getInstance();
+              availableDate.setTime(
+                  AppController.getDateFormatForResourceAvailability()
+                      .parse(resourceArrayList.get(i).getAvailability().getAvailableDate()));
+              availableDate.set(Calendar.HOUR, 0);
+              availableDate.set(Calendar.MINUTE, 0);
+              availableDate.set(Calendar.SECOND, 0);
+              availableDate.set(Calendar.AM_PM, Calendar.AM);
+
+              Calendar currentday = Calendar.getInstance();
+              if ((currentday.getTime().before(expiryDate.getTime())
+                      || currentday.getTime().equals(expiryDate.getTime()))
+                  && (currentday.getTime().after(availableDate.getTime())
+                      || currentday.getTime().equals(availableDate.getTime()))) {
+                resources.add(resourceArrayList.get(i));
+              }
+            } catch (ParseException e) {
+              Logger.log(e);
+            }
+          } else {
+            resources.add(resourceArrayList.get(i));
+          }
+
+        } else if (resourceArrayList.get(i).getAudience() != null
+            && resourceArrayList.get(i).getAudience().equalsIgnoreCase("Limited")) {
+          if (resourceArrayList
+              .get(i)
+              .getAvailability()
+              .getAvailabilityType()
+              .equalsIgnoreCase("AnchorDate")) {
+            if (resourceArrayList
+                .get(i)
+                .getAvailability()
+                .getSourceType()
+                .equalsIgnoreCase("ActivityResponse")) {
+              if (resourceArrayList
+                  .get(i)
+                  .getAvailability()
+                  .getAvailableDate()
+                  .equalsIgnoreCase("")) {
+                StepRecordCustom stepRecordCustom =
+                    dbServiceSubscriber.getSurveyResponseFromDB(
+                        ((SurveyActivity) context).getStudyId()
+                            + "_STUDYID_"
+                            + AppController.getSourceActivityId(resourceArrayList.get(i)),
+                        AppController.getSourceKey(resourceArrayList.get(i)),
+                        realm);
+                if (stepRecordCustom != null) {
+                  Calendar startCalender = Calendar.getInstance();
+
+                  Calendar endCalender = Calendar.getInstance();
+
+                  JSONObject jsonObject = null;
+                  try {
+                    jsonObject = new JSONObject(stepRecordCustom.getResult());
+                    startCalender.setTime(
+                        AppController.getDateFormatForApi().parse("" + jsonObject.get("answer")));
+                    startCalender.add(
+                        Calendar.DATE, resourceArrayList.get(i).getAvailability().getStartDays());
+                    if (resourceArrayList.get(i).getAvailability().getStartTime() == null
+                        || resourceArrayList
+                            .get(i)
+                            .getAvailability()
+                            .getStartTime()
+                            .equalsIgnoreCase("")) {
+                      startCalender.set(Calendar.HOUR_OF_DAY, 0);
+                      startCalender.set(Calendar.MINUTE, 0);
+                      startCalender.set(Calendar.SECOND, 0);
+                    } else {
+                      String[] time =
+                          resourceArrayList.get(i).getAvailability().getStartTime().split(":");
+                      startCalender.set(Calendar.HOUR_OF_DAY, Integer.parseInt(time[0]));
+                      startCalender.set(Calendar.MINUTE, Integer.parseInt(time[1]));
+                      startCalender.set(Calendar.SECOND, Integer.parseInt(time[2]));
+                    }
+                    NotificationDbResources notificationsDb = null;
+                    RealmResults<NotificationDbResources> notificationsDbs =
+                        dbServiceSubscriber.getNotificationDbResources(
+                            AppController.getSourceActivityId(resourceArrayList.get(i)),
+                            ((SurveyActivity) context).getStudyId(),
+                            RESOURCES,
+                            realm);
+                    if (notificationsDbs != null && notificationsDbs.size() > 0) {
+                      for (int j = 0; j < notificationsDbs.size(); j++) {
+                        if (notificationsDbs
+                            .get(j)
+                            .getResourceId()
+                            .equalsIgnoreCase(resourceArrayList.get(i).getResourcesId())) {
+                          notificationsDb = notificationsDbs.get(j);
+                          break;
+                        }
+                      }
+                    }
+
+                    endCalender.setTime(
+                        AppController.getDateFormatForApi().parse("" + jsonObject.get("answer")));
+                    endCalender.add(
+                        Calendar.DATE, resourceArrayList.get(i).getAvailability().getEndDays());
+
+                    if (resourceArrayList.get(i).getAvailability().getEndTime() == null
+                        || resourceArrayList
+                            .get(i)
+                            .getAvailability()
+                            .getEndTime()
+                            .equalsIgnoreCase("")) {
+                      endCalender.set(Calendar.HOUR_OF_DAY, 23);
+                      endCalender.set(Calendar.MINUTE, 59);
+                      endCalender.set(Calendar.SECOND, 59);
+                    } else {
+                      String[] time =
+                          resourceArrayList.get(i).getAvailability().getEndTime().split(":");
+                      endCalender.set(Calendar.HOUR_OF_DAY, Integer.parseInt(time[0]));
+                      endCalender.set(Calendar.MINUTE, Integer.parseInt(time[1]));
+                      endCalender.set(Calendar.SECOND, Integer.parseInt(time[2]));
+                    }
+
+                    Calendar currentday = Calendar.getInstance();
+
+                    if ((currentday.getTime().after(startCalender.getTime())
+                            || currentday.getTime().equals(startCalender.getTime()))
+                        && (currentday.getTime().before(endCalender.getTime())
+                            || currentday.getTime().equals(endCalender.getTime()))) {
+                      resources.add(resourceArrayList.get(i));
+                    }
+                  } catch (JSONException | ParseException e) {
+                    Logger.log(e);
+                  }
+                }
+              }
+            } else {
+              // if anchordate is enrollment date
+              Calendar startCalender = Calendar.getInstance();
+              Calendar endCalender = Calendar.getInstance();
+              try {
+                for (int j = 0; j < arrayList.size(); j++) {
+                  if (resourceArrayList
+                      .get(i)
+                      .getResourcesId()
+                      .equalsIgnoreCase(arrayList.get(j).getTargetActivityId())) {
+                    startCalender.setTime(
+                        AppController.getDateFormatForApi()
+                            .parse(arrayList.get(j).getAnchorDate()));
+                    startCalender.add(
+                        Calendar.DATE, resourceArrayList.get(i).getAvailability().getStartDays());
+
+                    endCalender.setTime(
+                        AppController.getDateFormatForApi()
+                            .parse(arrayList.get(j).getAnchorDate()));
+                    endCalender.add(
+                        Calendar.DATE, resourceArrayList.get(i).getAvailability().getEndDays());
+                    break;
+                  }
+                }
+                if (resourceArrayList.get(i).getAvailability().getStartTime() == null
+                    || resourceArrayList
+                        .get(i)
+                        .getAvailability()
+                        .getStartTime()
+                        .equalsIgnoreCase("")) {
+                  startCalender.set(Calendar.HOUR_OF_DAY, 0);
+                  startCalender.set(Calendar.MINUTE, 0);
+                  startCalender.set(Calendar.SECOND, 0);
+                } else {
+                  String[] time =
+                      resourceArrayList.get(i).getAvailability().getStartTime().split(":");
+                  startCalender.set(Calendar.HOUR_OF_DAY, Integer.parseInt(time[0]));
+                  startCalender.set(Calendar.MINUTE, Integer.parseInt(time[1]));
+                  startCalender.set(Calendar.SECOND, Integer.parseInt(time[2]));
+                }
+
+                NotificationDbResources notificationsDb = null;
+                RealmResults<NotificationDbResources> notificationsDbs =
+                    dbServiceSubscriber.getNotificationDbResources(
+                        AppController.getSourceActivityId(resourceArrayList.get(i)),
+                        ((SurveyActivity) context).getStudyId(),
+                        RESOURCES,
+                        realm);
+                if (notificationsDbs != null && notificationsDbs.size() > 0) {
+                  for (int j = 0; j < notificationsDbs.size(); j++) {
+                    if (notificationsDbs
+                        .get(j)
+                        .getResourceId()
+                        .equalsIgnoreCase(resourceArrayList.get(i).getResourcesId())) {
+                      notificationsDb = notificationsDbs.get(j);
+                      break;
+                    }
+                  }
+                }
+
+                if (resourceArrayList.get(i).getAvailability().getEndTime() == null
+                    || resourceArrayList
+                        .get(i)
+                        .getAvailability()
+                        .getEndTime()
+                        .equalsIgnoreCase("")) {
+                  endCalender.set(Calendar.HOUR_OF_DAY, 23);
+                  endCalender.set(Calendar.MINUTE, 59);
+                  endCalender.set(Calendar.SECOND, 59);
+                } else {
+                  String[] time =
+                      resourceArrayList.get(i).getAvailability().getEndTime().split(":");
+                  endCalender.set(Calendar.HOUR_OF_DAY, Integer.parseInt(time[0]));
+                  endCalender.set(Calendar.MINUTE, Integer.parseInt(time[1]));
+                  endCalender.set(Calendar.SECOND, Integer.parseInt(time[2]));
+                }
+
+                Calendar currentday = Calendar.getInstance();
+
+                if ((currentday.getTime().after(startCalender.getTime())
+                        || currentday.getTime().equals(startCalender.getTime()))
+                    && (currentday.getTime().before(endCalender.getTime())
+                        || currentday.getTime().equals(endCalender.getTime()))) {
+                  resources.add(resourceArrayList.get(i));
+                }
+              } catch (ParseException e) {
+                Logger.log(e);
+              }
+            }
+          } else {
+            resources.add(resourceArrayList.get(i));
+          }
+        } else if (resourceArrayList.get(i).getAudience() == null) {
+          resources.add(resourceArrayList.get(i));
+        }
+      }
+    } else {
+      addStaticVal();
+    }
+
+    for (int i = 0; i < resources.size(); i++) {
+      boolean status = false;
+      try {
+        if (resources.get(i) != null
+            && resources.get(i).getAvailability().getSourceActivityId() != null) {
+          status = true;
+        }
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+      if (status) {
+        NotificationDbResources notificationsDb = null;
+        RealmResults<NotificationDbResources> notificationsDbs =
+            dbServiceSubscriber.getNotificationDbResources(
+                AppController.getSourceActivityId(resources.get(i)),
+                ((SurveyActivity) context).getStudyId(),
+                RESOURCES,
+                realm);
+        if (notificationsDbs != null && notificationsDbs.size() > 0) {
+          for (int j = 0; j < notificationsDbs.size(); j++) {
+            if (notificationsDbs
+                .get(j)
+                .getResourceId()
+                .equalsIgnoreCase(resources.get(i).getResourcesId())) {
+              notificationsDb = notificationsDbs.get(j);
+              break;
+            }
+          }
+        }
+        if (notificationsDb == null) {
+          setRemainder(
+              Calendar.getInstance(),
+              AppController.getSourceActivityId(resources.get(i)),
+              ((SurveyActivity) context).getStudyId(),
+              resources.get(i).getNotificationText(),
+              resources.get(i).getResourcesId());
+        }
+      }
+    }
+
+    studyRecyclerView.setLayoutManager(new LinearLayoutManager(context));
+    studyRecyclerView.setNestedScrollingEnabled(false);
+    ResourcesListAdapter resourcesListAdapter = new ResourcesListAdapter(context, resources, this);
+    studyRecyclerView.setAdapter(resourcesListAdapter);
+  }
+
+  private class ResponseData
+//      extends AsyncTask<String, Void, String>
+  {
+
+    String response = null;
+    String responseCode = null;
+    int position;
+    Responsemodel responseModel;
+    AnchorDateSchedulingDetails anchorDateSchedulingDetails;
+
+    ResponseData(int position, AnchorDateSchedulingDetails anchorDateSchedulingDetails) {
+      this.position = position;
+      this.anchorDateSchedulingDetails = anchorDateSchedulingDetails;
+    }
+
+    private void execute() {
+      Executor executor = Executors.newSingleThreadExecutor();
+      Handler handler = new Handler(Looper.myLooper());
+
+//      executor.execute(new Runnable() {
+//        @Override
+//        public void run() {
+
+          ConnectionDetector connectionDetector = new ConnectionDetector(context);
+          Realm realm = AppController.getRealmobj(context);
+          ActivityData activityDataRunId = realm
+              .where(ActivityData.class)
+              .equalTo("studyId", anchorDateSchedulingDetails.getStudyId())
+              .findFirst();
+
+          String actvityRunId = "";
+
+          for (int i = 0; i < activityDataRunId.getActivities().size(); i++) {
+            if (anchorDateSchedulingDetails
+                .getSourceActivityId()
+                .equalsIgnoreCase(activityDataRunId.getActivities().get(i).getActivityId())) {
+              actvityRunId = activityDataRunId.getActivities().get(i).getActivityRunId();
+            }
+          }
+
+          if (connectionDetector.isConnectingToInternet()) {
+            HashMap<String, String> header = new HashMap<>();
+            header.put(
+                getContext().getString(R.string.clientToken),
+                SharedPreferenceHelper.readPreference(
+                    context, getContext().getString(R.string.clientToken), ""));
+            header.put(
+                "Authorization",
+                "Bearer "
+                    + SharedPreferenceHelper.readPreference(
+                    context, getContext().getString(R.string.auth), ""));
+            header.put(
+                "userId",
+                SharedPreferenceHelper.readPreference(
+                    context, getContext().getString(R.string.userid), ""));
+            Studies studies =
+                realm
+                    .where(Studies.class)
+                    .equalTo("studyId", anchorDateSchedulingDetails.getStudyId())
+                    .findFirst();
+//            responseModel =
+//                HttpRequest.getRequest(
+//                    Urls.PROCESSRESPONSEDATA
+//                        + AppConfig.APP_ID_KEY
+//                        + "="
+//                        + AppConfig.APP_ID_VALUE
+//                        + "&participantId="
+//                        + anchorDateSchedulingDetails.getParticipantId()
+//                        + "&tokenId="
+//                        + studies.getHashedToken()
+//                        + "&siteId="
+//                        + studies.getSiteId()
+//                        + "&studyId="
+//                        + studies.getStudyId()
+//                        + "&activityId="
+//                        + anchorDateSchedulingDetails.getSourceActivityId()
+//                        + "&questionKey="
+//                        + anchorDateSchedulingDetails.getSourceKey()
+//                        + "&activityVersion="
+//                        + anchorDateSchedulingDetails.getActivityVersion()
+//                        + "&activityRunId="
+//                        + actvityRunId,
+//                    header,
+//                    "");
+            responseServerInterface = new ServiceManager().createService(ResponseServerInterface.class, UrlTypeConstants.ResponseDataStore);
+            responseServerInterface.getParticipantData(header, AppConfig.APP_ID_VALUE, anchorDateSchedulingDetails.getParticipantId(),
+                        studies.getHashedToken(), studies.getSiteId(), studies.getStudyId(), anchorDateSchedulingDetails.getSourceActivityId(),
+                        anchorDateSchedulingDetails.getSourceKey(), anchorDateSchedulingDetails.getActivityVersion(), actvityRunId)
+                .enqueue(new Callback<ResponseBody>() {
+                  @Override
+                  public void onResponse(Call<ResponseBody> call, Response<ResponseBody> responseData) {
+                    responseCode = String.valueOf(responseData.code());
+                    if (responseCode.equalsIgnoreCase("0") &&
+                        responseData.message().equalsIgnoreCase("timeout")) {
+                      AppController.getHelperProgressDialog().dismissDialog();
+                      Toast.makeText(
+                              context,
+                              getResources().getString(R.string.connection_timeout),
+                              Toast.LENGTH_SHORT)
+                          .show();
+                    } else if (responseCode.equalsIgnoreCase("0") &&
+                        responseData.message().equalsIgnoreCase("")) {
+                      response = "error";
+                    } else if (Integer.parseInt(responseCode) >= 201
+                        && Integer.parseInt(responseCode) < 300
+                        && responseData.message().equalsIgnoreCase("")) {
+                      response = "No data";
+                    } else if (Integer.parseInt(responseCode) >= 400
+                        && Integer.parseInt(responseCode) < 500
+                        && responseData.message().equalsIgnoreCase("http_not_ok")) {
+                      response = "client error";
+                    } else if (Integer.parseInt(responseCode) == 500) {
+                      try {
+                        JSONObject jsonObject = new JSONObject(responseData.body().string());
+                        String exception = String.valueOf(jsonObject.get("exception"));
+                        if (exception.contains("Query or table not found")) {
+                          // call remaining service
+                          callLabkeyService(position);
+                        } else {
+                          metadataProcess();
+                        }
+                      } catch (JSONException | IOException e) {
+                        metadataProcess();
+                        Logger.log(e);
+                      }
+                    } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_OK) {
+                  try {
+                    JSONObject jsonObject = new JSONObject(responseData.body().string());
+                    JSONArray jsonArray = (JSONArray) jsonObject.get("rows");
+                    Gson gson = new Gson();
+                    JSONObject jsonObject1 = new JSONObject(String.valueOf(jsonArray.get(0)));
+                    JSONArray jsonArray1 = (JSONArray) jsonObject1.get("data");
+                    Object value = null;
+                    for (int j = 0; j < jsonArray1.length(); j++) {
+                      Type type = new TypeToken<Map<String, Object>>() {
+                      }.getType();
+                      JSONObject jsonObjectData = (JSONObject) jsonArray1.get(j);
+                      Map<String, Object> map = gson.fromJson(String.valueOf(jsonObjectData), type);
+
+                      for (Map.Entry<String, Object> entry : map.entrySet()) {
+                        String key = entry.getKey();
+                        String valueobj = gson.toJson(entry.getValue());
+                        Map<String, Object> vauleMap = gson.fromJson(String.valueOf(valueobj), type);
+                        value = vauleMap.get("value");
+                        if (key.equalsIgnoreCase("anchorDate")) {
+                          try {
+                            Date anchordate = AppController.getLabkeyDateFormat().parse("" + value);
+                            value = AppController.getDateFormatForApi().format(anchordate);
+                          } catch (ParseException e) {
+                            Logger.log(e);
+                          }
+                        }
+                      }
+                    }
+                    // updating results back to DB
+                    StepRecordCustom stepRecordCustom = new StepRecordCustom();
+                    JSONObject jsonObject2 = new JSONObject();
+                    jsonObject2.put("answer", "" + value);
+                    stepRecordCustom.setResult(jsonObject2.toString());
+                    stepRecordCustom.setActivityID(
+                        anchorDateSchedulingDetails.getStudyId()
+                            + "_STUDYID_"
+                            + anchorDateSchedulingDetails.getSourceActivityId());
+                    stepRecordCustom.setStepId(anchorDateSchedulingDetails.getSourceKey());
+                    stepRecordCustom.setTaskStepID(
+                        anchorDateSchedulingDetails.getStudyId()
+                            + "_STUDYID_"
+                            + anchorDateSchedulingDetails.getSourceActivityId()
+                            + "_"
+                            + 1
+                            + "_"
+                            + anchorDateSchedulingDetails.getSourceKey());
+                    dbServiceSubscriber.updateStepRecord(context, stepRecordCustom);
+
+                    arrayList.get(position).setAnchorDate("" + value);
+                    callLabkeyService(position);
+                  } catch (Exception e) {
+                    Logger.log(e);
+                    metadataProcess();
+                  }
+                } else {
+                      metadataProcess();
+                    }
+                  }
+
+                  @Override
+                  public void onFailure(Call<ResponseBody> call, Throwable t) {
+
+                  }
+                });
+//            responseCode = responseModel.getResponseCode();
+//            response = responseModel.getResponseData();
+//            if (responseCode.equalsIgnoreCase("0") && response.equalsIgnoreCase("timeout")) {
+//              response = "timeout";
+//            } else if (responseCode.equalsIgnoreCase("0") && response.equalsIgnoreCase("")) {
+//              response = "error";
+//            } else if (Integer.parseInt(responseCode) >= 201
+//                    && Integer.parseInt(responseCode) < 300
+//                    && response.equalsIgnoreCase("")) {
+//              response = "No data";
+//            } else if (Integer.parseInt(responseCode) >= 400
+//                    && Integer.parseInt(responseCode) < 500
+//                    && response.equalsIgnoreCase("http_not_ok")) {
+//              response = "client error";
+//            } else if (Integer.parseInt(responseCode) >= 500
+//                    && Integer.parseInt(responseCode) < 600
+//                    && response.equalsIgnoreCase("http_not_ok")) {
+//              response = "server error";
+//            } else if (response.equalsIgnoreCase("http_not_ok")) {
+//              response = "Unknown error";
+//            } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_UNAUTHORIZED) {
+//              response = "session expired";
+//            } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_OK
+//                    && !response.equalsIgnoreCase("")) {
+//              response = response;
+//            } else {
+//              response = getString(R.string.unknown_error);
+//            }
+            dbServiceSubscriber.closeRealmObj(realm);
+
+          } else {
+            metadataProcess();
+            Toast.makeText(context, getContext().getString(R.string.unknown_error), Toast.LENGTH_SHORT)
+                .show();
+          }
+
+//          handler.post(new Runnable() {
+//            @Override
+//            public void run() {
+//              if (response != null) {
+//                if (response.equalsIgnoreCase("session expired")) {
+//                  AppController.getHelperProgressDialog().dismissDialog();
+//                  AppController.getHelperSessionExpired(context, "session expired");
+//                } else if (response.equalsIgnoreCase("timeout")) {
+//                  metadataProcess();
+//                  Toast.makeText(
+//                          context,
+//                          getContext().getResources().getString(R.string.connection_timeout),
+//                          Toast.LENGTH_SHORT)
+//                      .show();
+//                } else if (Integer.parseInt(responseCode) == 500) {
+//                  try {
+//                    JSONObject jsonObject = new JSONObject(String.valueOf(responseModel.getResponseData()));
+//                    String exception = String.valueOf(jsonObject.get("exception"));
+//                    if (exception.contains("Query or table not found")) {
+//                      // call remaining service
+//                      callLabkeyService(position);
+//                    } else {
+//                      metadataProcess();
+//                    }
+//                  } catch (JSONException e) {
+//                    metadataProcess();
+//                    Logger.log(e);
+//                  }
+//                }
+//                else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_OK) {
+//                  try {
+//                    JSONObject jsonObject = new JSONObject(response);
+//                    JSONArray jsonArray = (JSONArray) jsonObject.get("rows");
+//                    Gson gson = new Gson();
+//                    JSONObject jsonObject1 = new JSONObject(String.valueOf(jsonArray.get(0)));
+//                    JSONArray jsonArray1 = (JSONArray) jsonObject1.get("data");
+//                    Object value = null;
+//                    for (int j = 0; j < jsonArray1.length(); j++) {
+//                      Type type = new TypeToken<Map<String, Object>>() {
+//                      }.getType();
+//                      JSONObject jsonObjectData = (JSONObject) jsonArray1.get(j);
+//                      Map<String, Object> map = gson.fromJson(String.valueOf(jsonObjectData), type);
+//
+//                      for (Map.Entry<String, Object> entry : map.entrySet()) {
+//                        String key = entry.getKey();
+//                        String valueobj = gson.toJson(entry.getValue());
+//                        Map<String, Object> vauleMap = gson.fromJson(String.valueOf(valueobj), type);
+//                        value = vauleMap.get("value");
+//                        if (key.equalsIgnoreCase("anchorDate")) {
+//                          try {
+//                            Date anchordate = AppController.getLabkeyDateFormat().parse("" + value);
+//                            value = AppController.getDateFormatForApi().format(anchordate);
+//                          } catch (ParseException e) {
+//                            Logger.log(e);
+//                          }
+//                        }
+//                      }
+//                    }
+//                    // updating results back to DB
+//                    StepRecordCustom stepRecordCustom = new StepRecordCustom();
+//                    JSONObject jsonObject2 = new JSONObject();
+//                    jsonObject2.put("answer", "" + value);
+//                    stepRecordCustom.setResult(jsonObject2.toString());
+//                    stepRecordCustom.setActivityID(
+//                        anchorDateSchedulingDetails.getStudyId()
+//                            + "_STUDYID_"
+//                            + anchorDateSchedulingDetails.getSourceActivityId());
+//                    stepRecordCustom.setStepId(anchorDateSchedulingDetails.getSourceKey());
+//                    stepRecordCustom.setTaskStepID(
+//                        anchorDateSchedulingDetails.getStudyId()
+//                            + "_STUDYID_"
+//                            + anchorDateSchedulingDetails.getSourceActivityId()
+//                            + "_"
+//                            + 1
+//                            + "_"
+//                            + anchorDateSchedulingDetails.getSourceKey());
+//                    dbServiceSubscriber.updateStepRecord(context, stepRecordCustom);
+//
+//                    arrayList.get(position).setAnchorDate("" + value);
+//                    callLabkeyService(position);
+//                  } catch (Exception e) {
+//                    Logger.log(e);
+//                    metadataProcess();
+//                  }
+//                }
+//                else {
+//                  metadataProcess();
+//                }
+//              } else {
+//                metadataProcess();
+//                Toast.makeText(context, getContext().getString(R.string.unknown_error), Toast.LENGTH_SHORT)
+//                    .show();
+//              }
+//              }
+//          });
+//        }
+//
+//      });
+    }
+//    @Override
+////    protected void onPreExecute() {
+////      super.onPreExecute();
+//////      activityDataRunId = dbServiceSubscriber.getActivityPreference((
+//////          (SurveyActivity) context).getStudyId(), realm);
+////    }
+//
+////    @Override
+////    protected String doInBackground(String... params) {
+////
+////      ConnectionDetector connectionDetector = new ConnectionDetector(context);
+////      Realm realm = AppController.getRealmobj(context);
+////      ActivityData activityDataRunId = realm
+////          .where(ActivityData.class)
+////          .equalTo("studyId", anchorDateSchedulingDetails.getStudyId())
+////          .findFirst();
+////
+////      String actvityRunId = "";
+////
+////      for (int i = 0; i < activityDataRunId.getActivities().size(); i++) {
+////        if (anchorDateSchedulingDetails
+////            .getSourceActivityId()
+////            .equalsIgnoreCase(activityDataRunId.getActivities().get(i).getActivityId())) {
+////          actvityRunId = activityDataRunId.getActivities().get(i).getActivityRunId();
+////        }
+////      }
+////
+////      if (connectionDetector.isConnectingToInternet()) {
+////        HashMap<String, String> header = new HashMap<>();
+////        header.put(
+////            getContext().getString(R.string.clientToken),
+////            SharedPreferenceHelper.readPreference(
+////                context, getContext().getString(R.string.clientToken), ""));
+////        header.put(
+////            "Authorization",
+////            "Bearer "
+////                + SharedPreferenceHelper.readPreference(
+////                    context, getContext().getString(R.string.auth), ""));
+////        header.put(
+////            "userId",
+////            SharedPreferenceHelper.readPreference(
+////                context, getContext().getString(R.string.userid), ""));
+////        Studies studies =
+////            realm
+////                .where(Studies.class)
+////                .equalTo("studyId", anchorDateSchedulingDetails.getStudyId())
+////                .findFirst();
+////        responseModel =
+////            HttpRequest.getRequest(
+////                Urls.PROCESSRESPONSEDATA
+////                    + AppConfig.APP_ID_KEY
+////                    + "="
+////                    + AppConfig.APP_ID_VALUE
+////                    + "&participantId="
+////                    + anchorDateSchedulingDetails.getParticipantId()
+////                    + "&tokenId="
+////                    + studies.getHashedToken()
+////                    + "&siteId="
+////                    + studies.getSiteId()
+////                    + "&studyId="
+////                    + studies.getStudyId()
+////                    + "&activityId="
+////                    + anchorDateSchedulingDetails.getSourceActivityId()
+////                    + "&questionKey="
+////                    + anchorDateSchedulingDetails.getSourceKey()
+////                    + "&activityVersion="
+////                    + anchorDateSchedulingDetails.getActivityVersion()
+////                    + "&activityRunId="
+////                    + actvityRunId,
+////                header,
+////                "");
+////        dbServiceSubscriber.closeRealmObj(realm);
+////        responseCode = responseModel.getResponseCode();
+////        response = responseModel.getResponseData();
+////        if (responseCode.equalsIgnoreCase("0") && response.equalsIgnoreCase("timeout")) {
+////          response = "timeout";
+////        } else if (responseCode.equalsIgnoreCase("0") && response.equalsIgnoreCase("")) {
+////          response = "error";
+////        } else if (Integer.parseInt(responseCode) >= 201
+////            && Integer.parseInt(responseCode) < 300
+////            && response.equalsIgnoreCase("")) {
+////          response = "No data";
+////        } else if (Integer.parseInt(responseCode) >= 400
+////            && Integer.parseInt(responseCode) < 500
+////            && response.equalsIgnoreCase("http_not_ok")) {
+////          response = "client error";
+////        } else if (Integer.parseInt(responseCode) >= 500
+////            && Integer.parseInt(responseCode) < 600
+////            && response.equalsIgnoreCase("http_not_ok")) {
+////          response = "server error";
+////        } else if (response.equalsIgnoreCase("http_not_ok")) {
+////          response = "Unknown error";
+////        } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_UNAUTHORIZED) {
+////          response = "session expired";
+////        } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_OK
+////            && !response.equalsIgnoreCase("")) {
+////          response = response;
+////        } else {
+////          response = getContext().getString(R.string.unknown_error);
+////        }
+////      }
+////      return response;
+////    }
+//
+//    @Override
+//    protected void onPostExecute(String response) {
+//      super.onPostExecute(response);
+//      if (response != null) {
+//        if (response.equalsIgnoreCase("session expired")) {
+//          AppController.getHelperProgressDialog().dismissDialog();
+//          AppController.getHelperSessionExpired(context, "session expired");
+//        } else if (response.equalsIgnoreCase("timeout")) {
+//          metadataProcess();
+//          Toast.makeText(
+//                  context,
+//                  getContext().getResources().getString(R.string.connection_timeout),
+//                  Toast.LENGTH_SHORT)
+//              .show();
+//        } else if (Integer.parseInt(responseCode) == 500) {
+//          try {
+//            JSONObject jsonObject = new JSONObject(String.valueOf(responseModel.getResponseData()));
+//            String exception = String.valueOf(jsonObject.get("exception"));
+//            if (exception.contains("Query or table not found")) {
+//              // call remaining service
+//              callLabkeyService(this.position);
+//            } else {
+//              metadataProcess();
+//            }
+//          } catch (JSONException e) {
+//            metadataProcess();
+//            Logger.log(e);
+//          }
+//        } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_OK) {
+//          try {
+//            JSONObject jsonObject = new JSONObject(response);
+//            JSONArray jsonArray = (JSONArray) jsonObject.get("rows");
+//            Gson gson = new Gson();
+//            JSONObject jsonObject1 = new JSONObject(String.valueOf(jsonArray.get(0)));
+//            JSONArray jsonArray1 = (JSONArray) jsonObject1.get("data");
+//            Object value = null;
+//            for (int j = 0; j < jsonArray1.length(); j++) {
+//              Type type = new TypeToken<Map<String, Object>>() {
+//              }.getType();
+//              JSONObject jsonObjectData = (JSONObject) jsonArray1.get(j);
+//              Map<String, Object> map = gson.fromJson(String.valueOf(jsonObjectData), type);
+//
+//              for (Map.Entry<String, Object> entry : map.entrySet()) {
+//                String key = entry.getKey();
+//                String valueobj = gson.toJson(entry.getValue());
+//                Map<String, Object> vauleMap = gson.fromJson(String.valueOf(valueobj), type);
+//                value = vauleMap.get("value");
+//                if (key.equalsIgnoreCase("anchorDate")) {
+//                  try {
+//                    Date anchordate = AppController.getLabkeyDateFormat().parse("" + value);
+//                    value = AppController.getDateFormatForApi().format(anchordate);
+//                  } catch (ParseException e) {
+//                    Logger.log(e);
+//                  }
+//                }
+//              }
+//            }
+//            // updating results back to DB
+//            StepRecordCustom stepRecordCustom = new StepRecordCustom();
+//            JSONObject jsonObject2 = new JSONObject();
+//            jsonObject2.put("answer", "" + value);
+//            stepRecordCustom.setResult(jsonObject2.toString());
+//            stepRecordCustom.setActivityID(
+//                anchorDateSchedulingDetails.getStudyId()
+//                    + "_STUDYID_"
+//                    + anchorDateSchedulingDetails.getSourceActivityId());
+//            stepRecordCustom.setStepId(anchorDateSchedulingDetails.getSourceKey());
+//            stepRecordCustom.setTaskStepID(
+//                anchorDateSchedulingDetails.getStudyId()
+//                    + "_STUDYID_"
+//                    + anchorDateSchedulingDetails.getSourceActivityId()
+//                    + "_"
+//                    + 1
+//                    + "_"
+//                    + anchorDateSchedulingDetails.getSourceKey());
+//            dbServiceSubscriber.updateStepRecord(context, stepRecordCustom);
+//
+//            arrayList.get(this.position).setAnchorDate("" + value);
+//            callLabkeyService(this.position);
+//          } catch (Exception e) {
+//            Logger.log(e);
+//            metadataProcess();
+//          }
+//        } else {
+//          metadataProcess();
+//        }
+//      } else {
+//        metadataProcess();
+//        Toast.makeText(context, getContext().getString(R.string.unknown_error), Toast.LENGTH_SHORT)
+//            .show();
+//      }
+//    }
+  }
+
+  private void setErrorMessage(Throwable error, String response, String responseCode) {
+    responseCode = String.valueOf(AppController.getErrorCode(error));
+    response = AppController.getErrorMessage(error);
+    if (responseCode.equalsIgnoreCase("0") && response.equalsIgnoreCase("timeout")) {
+      response = "timeout";
+    } else if (responseCode.equalsIgnoreCase("0") && response.equalsIgnoreCase("")) {
+      response = "error";
+    } else if (Integer.parseInt(responseCode) >= 201
+            && Integer.parseInt(responseCode) < 300
+            && response.equalsIgnoreCase("")) {
+      response = "No data";
+    } else if (Integer.parseInt(responseCode) >= 400
+            && Integer.parseInt(responseCode) < 500
+            && response.equalsIgnoreCase("http_not_ok")) {
+      response = "client error";
+    } else if (Integer.parseInt(responseCode) >= 500
+            && Integer.parseInt(responseCode) < 600
+            && response.equalsIgnoreCase("http_not_ok")) {
+      response = "server error";
+    } else if (response.equalsIgnoreCase("http_not_ok")) {
+      response = "Unknown error";
+    } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_UNAUTHORIZED) {
+      response = "session expired";
+    } else if (Integer.parseInt(responseCode) == HttpURLConnection.HTTP_OK
+            && !response.equalsIgnoreCase("")) {
+      response = response;
+    } else {
+      response = getContext().getString(R.string.unknown_error);
+    }
+  }
+
+  private void metadataProcess() {
+    AppController.getHelperProgressDialog().dismissDialog();
+    setResourceAdapter();
+  }
+
+  private void setRemainder(
+      final Calendar startCalender,
+      final String activityId,
+      final String studyId,
+      final String notificationTest,
+      final String resourceId) {
+    RealmResults<NotificationDbResources> notificationsDbs =
+        dbServiceSubscriber.getNotificationDbResources(
+            activityId,
+            ((SurveyActivity) context).getStudyId(),
+            RESOURCES,
+            realm);
+    boolean status = false;
+
+    for (int i = 0; i < notificationsDbs.size(); i++) {
+      if (notificationsDbs.get(i).getDescription().equalsIgnoreCase(notificationTest)) {
+        status = true;
+        break;
+      }
+    }
+    if (!status && notificationTest != null && !notificationTest.isEmpty()) {
+      NotificationModuleSubscriber notificationModuleSubscriber =
+          new NotificationModuleSubscriber(dbServiceSubscriber, realm);
+      notificationModuleSubscriber.generateAnchorDateLocalNotification(
+          startCalender.getTime(), activityId, studyId, context, notificationTest, resourceId);
+    }
+  }
+
+  private void addStaticVal() {
+    ArrayList<String> labelArray = new ArrayList<String>();
+    ArrayList<Resource> tempResourceArrayList = new ArrayList<>();
+    tempResourceArrayList.addAll(resourceArrayList);
+    resourceArrayList.clear();
+    labelArray.add(context.getResources().getString(R.string.about_study));
+    labelArray.add(context.getResources().getString(R.string.consent_pdf));
+    if (studyResource.isShareDataPermissions()) {
+      labelArray.add(context.getResources().getString(R.string.data_sharing));
+    }
+    if (AppConfig.AppType.equalsIgnoreCase(context.getString(R.string.app_standalone))) {
+      labelArray.add(context.getResources().getString(R.string.resourceTerms));
+      labelArray.add(context.getResources().getString(R.string.resourcePolicy));
+    }
+    labelArray.add(context.getResources().getString(R.string.leave_study));
+
+    for (int i = 0; i < labelArray.size(); i++) {
+      Resource r = new Resource();
+      r.setTitle(labelArray.get(i));
+      resourceArrayList.add(r);
+    }
+    resourceArrayList.addAll(tempResourceArrayList);
+
+    tempResourceArrayList.clear();
+  }
+
+  @Override
+  public void asyncResponseFailure(int responseCode, String errormsg, String statusCode) {
+    AppController.getHelperProgressDialog().dismissDialog();
+    if (statusCode.equalsIgnoreCase("401")) {
+      Toast.makeText(context, errormsg, Toast.LENGTH_SHORT).show();
+      AppController.getHelperSessionExpired(context, errormsg);
+    } else {
+      // offline functionality
+      if (responseCode == RESOURCE_REQUEST_CODE) {
+        try {
+          if (dbServiceSubscriber.getStudyResource(studyId, realm) == null) {
+            Toast.makeText(context, errormsg, Toast.LENGTH_LONG).show();
+          } else if (dbServiceSubscriber.getStudyResource(studyId, realm).getResources() == null) {
+            Toast.makeText(context, errormsg, Toast.LENGTH_LONG).show();
+          } else {
+            resourceArrayList = dbServiceSubscriber.getStudyResource(studyId, realm).getResources();
+            if (resourceArrayList == null || resourceArrayList.size() == 0) {
+              Toast.makeText(context, errormsg, Toast.LENGTH_LONG).show();
+            } else {
+              calculatedResources(resourceArrayList);
+            }
+          }
+        } catch (Exception e) {
+          Logger.log(e);
+        }
+      } else {
+        Toast.makeText(context, errormsg, Toast.LENGTH_SHORT).show();
+      }
+    }
+  }
+
+  public void updateuserpreference() {
+    HashMap<String, String> header = new HashMap();
+    header.put(
+        "Authorization",
+        "Bearer "
+            + AppController.getHelperSharedPreference()
+                .readPreference(context, context.getResources().getString(R.string.auth), ""));
+    header.put(
+        "userId",
+        AppController.getHelperSharedPreference()
+            .readPreference(context, context.getResources().getString(R.string.userid), ""));
+
+    HashMap<String,String> jsonObject = new HashMap<>();
+
+    Studies studies =
+        dbServiceSubscriber.getStudies(((SurveyActivity) context).getStudyId(), realm);
+
+      jsonObject.put("participantId", studies.getParticipantId());
+      jsonObject.put("studyId", ((SurveyActivity) context).getStudyId());
+
+   /* ParticipantEnrollmentDatastoreConfigEvent participantEnrollmentDatastoreConfigEvent =
+        new ParticipantEnrollmentDatastoreConfigEvent(
+            "post_object",
+            Urls.WITHDRAW,
+            UPDATE_USERPREFERENCE_RESPONSECODE,
+            context,
+            LoginData.class,
+            null,
+            header,
+            jsonObject,
+            false,
+            this);
+    UpdatePreferenceEvent updatePreferenceEvent = new UpdatePreferenceEvent();
+    updatePreferenceEvent.setParticipantEnrollmentDatastoreConfigEvent(
+        participantEnrollmentDatastoreConfigEvent);
+    UserModulePresenter userModulePresenter = new UserModulePresenter();
+    userModulePresenter.performUpdateUserPreference(updatePreferenceEvent);*/
+    withDrawFromStudyApiCall(header,jsonObject);
+//    NetworkRequest.performAsyncRequest(anInterface.withdrawfromstudy(header, jsonObject),
+//        (data) -> {
+//          AppController.getHelperProgressDialog().dismissDialog();
+//          dbServiceSubscriber.updateStudyWithddrawnDB(context, studyId, StudyFragment.WITHDRAWN);
+//          dbServiceSubscriber.deleteActivityDataRow(context, studyId);
+//          dbServiceSubscriber.deleteActivityWsData(context, studyId);
+//
+//          if (AppConfig.AppType.equalsIgnoreCase(getContext().getString(R.string.app_gateway))) {
+//            Intent intent = new Intent(context, StudyActivity.class);
+//            ComponentName cn = intent.getComponent();
+//            Intent mainIntent = Intent.makeRestartActivityTask(cn);
+//            context.startActivity(mainIntent);
+//            ((Activity) context).finish();
+//          } else {
+//            deactivateAccount();
+//          }
+//        }, (error) -> {
+//          AppController.getHelperProgressDialog().dismissDialog();
+//          if (error.getMessage().equalsIgnoreCase("401")) {
+//            Toast.makeText(context, error.getMessage(), Toast.LENGTH_SHORT).show();
+//            AppController.getHelperSessionExpired(context, error.getMessage());
+//          }
+//        });
+  }
+
+  private void withDrawFromStudyApiCall(HashMap<String, String> header, HashMap<String,String> jsonObject) {
+    enrollmentDataStoreInterface = new ServiceManager()
+        .createService(EnrollmentDataStoreInterface.class, UrlTypeConstants.EnrollmentDataStore);
+    NetworkRequest.performAsyncRequest(enrollmentDataStoreInterface
+            .withdrawfromstudy(header, jsonObject),
+        (data) -> {
+          try {
+            withDrawFromStudy();
+          } catch (Exception e) {
+            Log.e("TAG", e.getMessage());
+          }
+
+        }, (error) -> {
+          AppController.getHelperProgressDialog().dismissDialog();
+          code = AppController.getErrorCode(error);
+          errormsg = AppController.getErrorMessage(error);
+          if (code == 401 && errormsg.equalsIgnoreCase("Unauthorized or Invalid token")) {
+            AppController.checkRefreshToken(context, new AppController.RefreshTokenListener() {
+              @Override
+              public void onRefreshTokenCompleted(String result) {
+                Log.e("check", "response is 2 " + result);
+                if (result.equalsIgnoreCase("sucess")) {
+                  header.put(
+                      "Authorization",
+                      "Bearer "
+                          + AppController.getHelperSharedPreference()
+                          .readPreference(context, context.getResources().getString(R.string.auth), ""));
+                  withDrawFromStudyApiCall(header, jsonObject);
+                } else {
+                  AppController.getHelperProgressDialog().dismissDialog();
+                  Toast.makeText(context, "session expired", Toast.LENGTH_LONG).show();
+                  AppController.getHelperSessionExpired(context, "");
+                }
+              }
+            },UrlTypeConstants.EnrollmentDataStore);
+          }
+        });
+  }
+
+  private void withDrawFromStudy() {
+    ((Activity)context).runOnUiThread(new Runnable() {
+      @Override
+      public void run() {
+        dbServiceSubscriber.updateStudyWithddrawnDB(context, studyId, StudyFragment.WITHDRAWN);
+        dbServiceSubscriber.deleteActivityDataRow(context, studyId);
+        dbServiceSubscriber.deleteActivityWsData(context, studyId);
+
+        if (AppConfig.AppType.equalsIgnoreCase(getContext().getString(R.string.app_gateway))) {
+          Intent intent = new Intent(context, StudyActivity.class);
+          ComponentName cn = intent.getComponent();
+          Intent mainIntent = Intent.makeRestartActivityTask(cn);
+          context.startActivity(mainIntent);
+          ((Activity) context).finish();
+        } else {
+          deactivateAccount();
+        }
+      }});
+  }
+
+  public void responseServerWithdrawFromStudy() {
+    AppController.getHelperProgressDialog().showProgress(context, "", "", false);
+
+    dbServiceSubscriber.deleteActivityRunsFromDbByStudyID(
+        context, ((SurveyActivity) context).getStudyId());
+    dbServiceSubscriber.deleteResponseFromDb(((SurveyActivity) context).getStudyId(), realm);
+    updateuserpreference();
+  }
+
+  @Override
+  public void onDestroy() {
+    dbServiceSubscriber.closeRealmObj(realm);
+    super.onDestroy();
+  }
+
+  private void callLabkeyService(int position) {
+    if (arrayList.size() > position) {
+      AnchorDateSchedulingDetails anchorDateSchedulingDetails = arrayList.get(position);
+      if (anchorDateSchedulingDetails.getSourceType().equalsIgnoreCase("ActivityResponse")
+          && anchorDateSchedulingDetails.getActivityState().equalsIgnoreCase("completed")) {
+        Realm realm = AppController.getRealmobj(context);
+        StepRecordCustom stepRecordCustom =
+            dbServiceSubscriber.getSurveyResponseFromDB(
+                anchorDateSchedulingDetails.getStudyId()
+                    + "_STUDYID_"
+                    + anchorDateSchedulingDetails.getSourceActivityId(),
+                anchorDateSchedulingDetails.getSourceKey(),
+                realm);
+        if (stepRecordCustom != null) {
+          String value = "";
+          try {
+            JSONObject jsonObject = new JSONObject(stepRecordCustom.getResult());
+            value = jsonObject.getString("answer");
+          } catch (JSONException e) {
+            Logger.log(e);
+          }
+          arrayList.get(position).setAnchorDate("" + value);
+
+          callLabkeyService(position + 1);
+        } else {
+          new ResponseData(position, anchorDateSchedulingDetails).execute();
+        }
+        dbServiceSubscriber.closeRealmObj(realm);
+      } else {
+        callLabkeyService(position + 1);
+      }
+    } else {
+      metadataProcess();
+    }
+  }
+
+  public void deactivateAccount() {
+    HashMap<String, String> header = new HashMap();
+    header.put(
+        "Authorization",
+        "Bearer "
+            + AppController.getHelperSharedPreference()
+                .readPreference(context, context.getResources().getString(R.string.auth), ""));
+    header.put(
+        "userId",
+        AppController.getHelperSharedPreference()
+            .readPreference(context, context.getResources().getString(R.string.userid), ""));
+    DeleteAccountEvent deleteAccountEvent = new DeleteAccountEvent();
+    Gson gson = new Gson();
+    DeleteAccountData deleteAccountData = new DeleteAccountData();
+    String json = gson.toJson(deleteAccountData);
+    HashMap obj = null;
+    try {
+      obj = new HashMap();
+      JSONArray jsonArray1 = new JSONArray();
+      JSONObject jsonObject = new JSONObject();
+      jsonObject.put("studyId", AppConfig.StudyId);
+      jsonArray1.put(jsonObject);
+      obj.put("studyData", jsonArray1);
+    } catch (JSONException e) {
+      Logger.log(e);
+    }
+//    ParticipantDatastoreConfigEvent participantDatastoreConfigEvent =
+//        new ParticipantDatastoreConfigEvent(
+//            "delete_object",
+//            Urls.DELETE_ACCOUNT,
+//            DELETE_ACCOUNT_REPSONSECODE,
+//            context,
+//            LoginData.class,
+//            null,
+//            header,
+//            obj,
+//            false,
+//            this);
+//    deleteAccountEvent.setParticipantDatastoreConfigEvent(participantDatastoreConfigEvent);
+//    UserModulePresenter userModulePresenter = new UserModulePresenter();
+//    userModulePresenter.performDeleteAccount(deleteAccountEvent);
+    deleteAccountApiCall(header,obj);
+  }
+
+  private void deleteAccountApiCall(HashMap<String, String> header, HashMap obj) {
+    NetworkRequest.performAsyncRequest(anInterface.deactivate(header, obj), (data) -> {
+      AppController.getHelperProgressDialog().dismissDialog();
+      LoginData loginData = (LoginData) data;
+      if (loginData != null) {
+        AppController.getHelperSessionExpired(context, "");
+        Toast.makeText(context, R.string.account_deletion, Toast.LENGTH_SHORT).show();
+      } else {
+        Toast.makeText(context, R.string.unable_to_parse, Toast.LENGTH_SHORT).show();
+      }
+    }, (error) -> {
+      code = AppController.getErrorCode(error);
+      errormsg = AppController.getErrorMessage(error);
+      if (code == 401 && errormsg.equalsIgnoreCase("Unauthorized or Invalid token")) {
+        AppController.checkRefreshToken(context, new AppController.RefreshTokenListener() {
+          @Override
+          public void onRefreshTokenCompleted(String result) {
+            Log.e("check", "response is 2 " + result);
+            if (result.equalsIgnoreCase("sucess")) {
+              header.put(
+                  "Authorization",
+                  "Bearer "
+                      + AppController.getHelperSharedPreference()
+                      .readPreference(context, context.getResources().getString(R.string.auth), ""));
+             deleteAccountApiCall(header,obj);
+            } else {
+              AppController.getHelperProgressDialog().dismissDialog();
+              Toast.makeText(context, "session expired", Toast.LENGTH_LONG).show();
+              AppController.getHelperSessionExpired(context, "");
+            }
+          }
+        }, UrlTypeConstants.ParticipantDataStore);
+      } else {
+        AppController.getHelperProgressDialog().dismissDialog();
+        Toast.makeText(context, errormsg, Toast.LENGTH_SHORT).show();
+      }
+    });
+  }
+}
