@@ -1,0 +1,6 @@
+framework module Pods_Bubs {
+  umbrella header "Pods-Bubs-umbrella.h"
+
+  export *
+  module * { export * }
+}
