@@ -123,7 +123,6 @@
 		6F4B51B7250644A200DC5991 /* SessionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4B51B6250644A200DC5991 /* SessionService.swift */; };
 		6F4B51B92506562D00DC5991 /* URL+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4B51B82506562D00DC5991 /* URL+Extensions.swift */; };
 		6F4B51BB250659DB00DC5991 /* APIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4B51BA250659DB00DC5991 /* APIService.swift */; };
-		6F4E1B2D24223C210051D3E2 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 6F4E1B2A24223C210051D3E2 /* README.md */; };
 		6F4E1B2F24223CA20051D3E2 /* UIImage+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4E1B2E24223CA20051D3E2 /* UIImage+Extensions.swift */; };
 		6F55B9BA250225AC00A052A9 /* AuthRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F55B9B9250225AC00A052A9 /* AuthRouter.swift */; };
 		6F55B9BE250239DA00A052A9 /* HydraAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F55B9BD250239DA00A052A9 /* HydraAPI.swift */; };
@@ -460,7 +459,6 @@
 		D2310F282880F2860083731A /* NewProgressView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 6EDDB6591EE05E4C00C79337 /* NewProgressView.xib */; };
 		D2310F292880F2860083731A /* fda_preload.gif in Resources */ = {isa = PBXBuildFile; fileRef = 6EDDB6601EE05FDC00C79337 /* fda_preload.gif */; };
 		D2310F2A2880F2860083731A /* StudyOverview.plist in Resources */ = {isa = PBXBuildFile; fileRef = 4833E9E21E712C2B0032D244 /* StudyOverview.plist */; };
-		D2310F2B2880F2860083731A /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 6F4E1B2A24223C210051D3E2 /* README.md */; };
 		D2310F2C2880F2860083731A /* Login.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 94B3DD2C1E6ED8E500327AE5 /* Login.storyboard */; };
 		D2310F2D2880F2860083731A /* ActivitySchedules.xib in Resources */ = {isa = PBXBuildFile; fileRef = 942591C31EA8A2650010D892 /* ActivitySchedules.xib */; };
 		D2310F2E2880F2860083731A /* Notification.json in Resources */ = {isa = PBXBuildFile; fileRef = 6E14F2021F0224AD00EA8D1E /* Notification.json */; };
@@ -683,7 +681,6 @@
 		D28F72DB276A938400B9462C /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = D2878BC6275054150090A493 /* GoogleService-Info.plist */; };
 		D28F72DC276A938400B9462C /* fda_preload.gif in Resources */ = {isa = PBXBuildFile; fileRef = 6EDDB6601EE05FDC00C79337 /* fda_preload.gif */; };
 		D28F72DD276A938400B9462C /* StudyOverview.plist in Resources */ = {isa = PBXBuildFile; fileRef = 4833E9E21E712C2B0032D244 /* StudyOverview.plist */; };
-		D28F72DE276A938400B9462C /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 6F4E1B2A24223C210051D3E2 /* README.md */; };
 		D28F72DF276A938400B9462C /* Login.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 94B3DD2C1E6ED8E500327AE5 /* Login.storyboard */; };
 		D28F72E0276A938400B9462C /* ActivitySchedules.xib in Resources */ = {isa = PBXBuildFile; fileRef = 942591C31EA8A2650010D892 /* ActivitySchedules.xib */; };
 		D28F72E1276A938400B9462C /* Notification.json in Resources */ = {isa = PBXBuildFile; fileRef = 6E14F2021F0224AD00EA8D1E /* Notification.json */; };
@@ -908,7 +905,6 @@
 		D2B3B42626953E79003D3DA8 /* NewProgressView.xib in Resources */ = {isa = PBXBuildFile; fileRef = 6EDDB6591EE05E4C00C79337 /* NewProgressView.xib */; };
 		D2B3B42726953E79003D3DA8 /* fda_preload.gif in Resources */ = {isa = PBXBuildFile; fileRef = 6EDDB6601EE05FDC00C79337 /* fda_preload.gif */; };
 		D2B3B42826953E79003D3DA8 /* StudyOverview.plist in Resources */ = {isa = PBXBuildFile; fileRef = 4833E9E21E712C2B0032D244 /* StudyOverview.plist */; };
-		D2B3B42926953E79003D3DA8 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = 6F4E1B2A24223C210051D3E2 /* README.md */; };
 		D2B3B42A26953E79003D3DA8 /* Login.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 94B3DD2C1E6ED8E500327AE5 /* Login.storyboard */; };
 		D2B3B42B26953E79003D3DA8 /* ActivitySchedules.xib in Resources */ = {isa = PBXBuildFile; fileRef = 942591C31EA8A2650010D892 /* ActivitySchedules.xib */; };
 		D2B3B42C26953E79003D3DA8 /* Notification.json in Resources */ = {isa = PBXBuildFile; fileRef = 6E14F2021F0224AD00EA8D1E /* Notification.json */; };
@@ -1175,7 +1171,6 @@
 		6F4B51B6250644A200DC5991 /* SessionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionService.swift; sourceTree = "<group>"; };
 		6F4B51B82506562D00DC5991 /* URL+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+Extensions.swift"; sourceTree = "<group>"; };
 		6F4B51BA250659DB00DC5991 /* APIService.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = APIService.swift; sourceTree = "<group>"; };
-		6F4E1B2A24223C210051D3E2 /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
 		6F4E1B2E24223CA20051D3E2 /* UIImage+Extensions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "UIImage+Extensions.swift"; sourceTree = "<group>"; };
 		6F55B9B9250225AC00A052A9 /* AuthRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthRouter.swift; sourceTree = "<group>"; };
 		6F55B9BD250239DA00A052A9 /* HydraAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HydraAPI.swift; sourceTree = "<group>"; };
@@ -1478,7 +1473,6 @@
 		6E7D2D4D1E433E8700763D4C = {
 			isa = PBXGroup;
 			children = (
-				6F4E1B2A24223C210051D3E2 /* README.md */,
 				6EF0BC352223D1D5004F2357 /* ResearchKit.xcodeproj */,
 				6E7D2D581E433E8700763D4C /* MyStudies */,
 				7878B31B2216C6E20052FC23 /* MyStudiesTests */,
@@ -2830,7 +2824,7 @@
 						TestTargetID = D2B3B35926953E79003D3DA8;
 					};
 					D2310E5B2880F2860083731A = {
-						DevelopmentTeam = FV8LM93U7M;
+						DevelopmentTeam = 3485DDCN2M;
 						ProvisioningStyle = Automatic;
 					};
 					D28F720D276A938400B9462C = {
@@ -2966,7 +2960,6 @@
 				D2008FBC2970547F00EE8B9F /* ConfigValidcare.debug.xcconfig in Resources */,
 				6EDDB6611EE05FDC00C79337 /* fda_preload.gif in Resources */,
 				4833E9E31E712C2B0032D244 /* StudyOverview.plist in Resources */,
-				6F4E1B2D24223C210051D3E2 /* README.md in Resources */,
 				94B3DD511E6ED8E500327AE5 /* Login.storyboard in Resources */,
 				942591C41EA8A2650010D892 /* ActivitySchedules.xib in Resources */,
 				CDFB21E029CDB94900C10427 /* New2ProgressView.xib in Resources */,
@@ -3045,7 +3038,6 @@
 				D2310F292880F2860083731A /* fda_preload.gif in Resources */,
 				D2310F2A2880F2860083731A /* StudyOverview.plist in Resources */,
 				D2008FB52970546800EE8B9F /* ConfigBubs.release.xcconfig in Resources */,
-				D2310F2B2880F2860083731A /* README.md in Resources */,
 				D2310F2C2880F2860083731A /* Login.storyboard in Resources */,
 				D2310F2D2880F2860083731A /* ActivitySchedules.xib in Resources */,
 				CDFB21DB29CDB94900C10427 /* New2ProgressView.xib in Resources */,
@@ -3108,7 +3100,6 @@
 				D28F72DB276A938400B9462C /* GoogleService-Info.plist in Resources */,
 				D28F72DC276A938400B9462C /* fda_preload.gif in Resources */,
 				D28F72DD276A938400B9462C /* StudyOverview.plist in Resources */,
-				D28F72DE276A938400B9462C /* README.md in Resources */,
 				D28F72DF276A938400B9462C /* Login.storyboard in Resources */,
 				D28F72E0276A938400B9462C /* ActivitySchedules.xib in Resources */,
 				CDFB21E129CDB94900C10427 /* New2ProgressView.xib in Resources */,
@@ -3172,7 +3163,6 @@
 				D2B3B42626953E79003D3DA8 /* NewProgressView.xib in Resources */,
 				D2B3B42726953E79003D3DA8 /* fda_preload.gif in Resources */,
 				D2B3B42826953E79003D3DA8 /* StudyOverview.plist in Resources */,
-				D2B3B42926953E79003D3DA8 /* README.md in Resources */,
 				D2B3B42A26953E79003D3DA8 /* Login.storyboard in Resources */,
 				CDFB21DF29CDB94900C10427 /* New2ProgressView.xib in Resources */,
 				D2B3B42B26953E79003D3DA8 /* ActivitySchedules.xib in Resources */,
@@ -4700,7 +4690,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = FV8LM93U7M;
+				DEVELOPMENT_TEAM = 3485DDCN2M;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = "$(SRCROOT)/MyStudies/BubsInfo.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = BubsCare;
@@ -4709,7 +4699,7 @@
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 4.3.6;
 				MTL_ENABLE_DEBUG_INFO = NO;
-				PRODUCT_BUNDLE_IDENTIFIER = com.validcare.bubs;
+				PRODUCT_BUNDLE_IDENTIFIER = com.btc.mystudiesgcp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "MyStudies/Utils/Helpers/FDA-Bridging-Header.h";
@@ -4733,7 +4723,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = FV8LM93U7M;
+				DEVELOPMENT_TEAM = 3485DDCN2M;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = "$(SRCROOT)/MyStudies/BubsInfo.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = BubsCare;
@@ -4741,7 +4731,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 4.3.6;
-				PRODUCT_BUNDLE_IDENTIFIER = com.validcare.bubs;
+				PRODUCT_BUNDLE_IDENTIFIER = com.btc.mystudiesgcp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_OBJC_BRIDGING_HEADER = "MyStudies/Utils/Helpers/FDA-Bridging-Header.h";
